@@ -1,12 +1,19 @@
 <script setup>
-import { onMounted, ref } from 'vue'
-import { getMyHistory } from '../data/supabase.js'
+import { computed, onMounted, ref } from 'vue'
+import { getMyHistory, getVotes } from '../data/supabase.js'
 
 const cases = ref([])
 const loading = ref(true)
+const modeFilter = ref('all')
+const voteMap = ref({})
 
 onMounted(async () => {
   cases.value = await getMyHistory()
+  const entries = {}
+  await Promise.all(cases.value.map(async (item) => {
+    entries[item.id] = await getVotes(item.id)
+  }))
+  voteMap.value = entries
   loading.value = false
 })
 
@@ -19,6 +26,8 @@ function topParty(result) {
   if (!result?.scores) return null
   return Object.entries(result.scores).sort((a, b) => b[1] - a[1])[0] || null
 }
+
+const visibleCases = computed(() => cases.value.filter((item) => modeFilter.value === 'all' || item.mode === modeFilter.value))
 </script>
 
 <template>
@@ -40,29 +49,41 @@ function topParty(result) {
         <router-link to="/" class="btn-primary mt-6">去评理</router-link>
       </div>
 
-      <div v-else class="space-y-4">
-        <router-link
-          v-for="item in cases"
-          :key="item.id"
-          :to="`/result/${item.id}`"
-          class="panel block p-5 transition-transform hover:-translate-y-0.5"
-        >
-          <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div class="min-w-0 flex-1">
-              <p class="text-xl font-semibold text-brand-dark">{{ item.result?.summary || '评理记录' }}</p>
-              <p class="mt-2 text-sm leading-7 text-slate-700">{{ item.result?.verdict || '暂无裁定摘要' }}</p>
-              <p class="mt-3 text-sm leading-7 text-slate-600">{{ item.result?.analysis || '' }}</p>
-            </div>
-            <div class="w-full shrink-0 rounded-2xl bg-slate-50 p-4 md:w-56">
-              <p class="text-xs uppercase tracking-[0.18em] text-slate-500">顶部结论</p>
-              <div v-if="topParty(item.result)" class="mt-3">
-                <p class="text-2xl font-semibold text-brand-dark">{{ topParty(item.result)[1] }}%</p>
-                <p class="mt-1 text-sm text-slate-600">{{ topParty(item.result)[0] }}</p>
+      <div v-else>
+        <div class="mb-5 flex flex-wrap gap-2">
+          <button :class="['mode-pill', modeFilter === 'all' ? 'mode-pill--active' : '']" @click="modeFilter = 'all'">全部</button>
+          <button :class="['mode-pill', modeFilter === 'single' ? 'mode-pill--active' : '']" @click="modeFilter = 'single'">单方</button>
+          <button :class="['mode-pill', modeFilter === 'multi' ? 'mode-pill--active' : '']" @click="modeFilter = 'multi'">多方</button>
+        </div>
+
+        <div class="space-y-4">
+          <router-link
+            v-for="item in visibleCases"
+            :key="item.id"
+            :to="`/result/${item.id}`"
+            class="panel block p-5 transition-transform hover:-translate-y-0.5"
+          >
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div class="min-w-0 flex-1">
+                <div class="mb-3 flex flex-wrap items-center gap-2">
+                  <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">{{ item.mode === 'multi' ? '多方争议' : '单方描述' }}</span>
+                  <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">👍 {{ voteMap[item.id]?.up || 0 }} / 👎 {{ voteMap[item.id]?.down || 0 }}</span>
+                </div>
+                <p class="text-xl font-semibold text-brand-dark">{{ item.result?.summary || '评理记录' }}</p>
+                <p class="mt-2 text-sm leading-7 text-slate-700">{{ item.result?.verdict || '暂无裁定摘要' }}</p>
+                <p class="mt-3 text-sm leading-7 text-slate-600">{{ item.result?.analysis || '' }}</p>
               </div>
-              <p class="mt-4 text-xs text-slate-500">{{ formatDate(item.created_at) }}</p>
+              <div class="w-full shrink-0 rounded-2xl bg-slate-50 p-4 md:w-56">
+                <p class="text-xs uppercase tracking-[0.18em] text-slate-500">顶部结论</p>
+                <div v-if="topParty(item.result)" class="mt-3">
+                  <p class="text-2xl font-semibold text-brand-dark">{{ topParty(item.result)[1] }}%</p>
+                  <p class="mt-1 text-sm text-slate-600">{{ topParty(item.result)[0] }}</p>
+                </div>
+                <p class="mt-4 text-xs text-slate-500">{{ formatDate(item.created_at) }}</p>
+              </div>
             </div>
-          </div>
-        </router-link>
+          </router-link>
+        </div>
       </div>
     </div>
   </div>

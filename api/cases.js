@@ -107,7 +107,7 @@ async function queryCases(req) {
       const limit = Math.min(Math.max(Number.parseInt(recentParam, 10) || 10, 1), 50)
       const { data, error } = await supabase
         .from('cases')
-        .select('id, result, created_at')
+        .select('id, mode, input, result, created_at')
         .order('created_at', { ascending: false })
         .limit(limit)
 

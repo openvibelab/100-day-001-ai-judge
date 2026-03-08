@@ -24,8 +24,9 @@ const mode = ref('single')
 const singleContent = ref('')
 const multiTopic = ref('')
 const perspectives = ref([])
-const showGuide = ref(true)
+const showGuide = ref(false)
 const showApiSetup = ref(false)
+const showAdvanced = ref(false)
 
 const PARTY_LABELS = ['甲方', '乙方', '丙方', '丁方', '戊方', '己方']
 const MAX_PARTIES = 6
@@ -43,6 +44,7 @@ const showQuotaModal = ref(false)
 const pendingPayload = ref(null)
 
 const loadingMessages = ['正在整理案情', '正在对齐各方说法', '正在给出裁定', '正在润色结论']
+const quickPrompts = ['什么时候开始吵的？', '谁先说了什么？', '对方怎么回应的？', '你最介意的点是什么？']
 
 onMounted(async () => {
   caseCount.value = await getCaseCount()
@@ -142,6 +144,7 @@ async function doSubmit(payload) {
     } else if (e.code === 'INVALID_KEY') {
       error.value = e.message || 'API Key 无效，请检查后重试'
       showApiSetup.value = true
+      showAdvanced.value = true
     } else {
       error.value = e.message || '请求失败，请稍后再试'
     }
@@ -220,13 +223,13 @@ async function retryWithNewKey() {
 
   <div class="page-surface min-h-full">
     <div class="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-10">
-      <section class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-        <div class="panel p-6 md:p-8">
-          <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
+      <section class="panel p-6 md:p-8">
+        <div class="border-b border-slate-200 pb-5">
+          <div class="flex flex-wrap items-start justify-between gap-4">
             <div class="max-w-2xl">
-              <p class="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">OpenVibeLab</p>
-              <h1 class="mt-2 text-3xl font-semibold tracking-tight text-brand-dark md:text-4xl">把事情说清楚，再让 AI 来裁。</h1>
-              <p class="mt-3 text-base leading-7 text-slate-600">先把争议写完整，系统会生成可分享的裁定页。这个首页现在只做一件事：让你顺畅输入。</p>
+              <p class="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">OpenVibeLab / Day 001</p>
+              <h1 class="mt-2 text-3xl font-semibold tracking-tight text-brand-dark md:text-4xl">把争议写下来，马上拿到一份判断。</h1>
+              <p class="mt-3 max-w-xl text-base leading-7 text-slate-600">这里先只做一件事：帮你把事情写清楚，然后生成一页能直接发给对方看的结果。</p>
             </div>
             <div class="stats-chip">
               <span class="stats-chip__label">累计裁定</span>
@@ -234,116 +237,120 @@ async function retryWithNewKey() {
             </div>
           </div>
 
-          <div class="mt-6 flex flex-wrap items-center gap-3">
-            <button :class="['mode-pill', mode === 'single' ? 'mode-pill--active' : '']" @click="mode = 'single'">单方描述</button>
-            <button :class="['mode-pill', mode === 'multi' ? 'mode-pill--active' : '']" @click="mode = 'multi'; if (perspectives.length === 0) { addPerspective(); addPerspective() }">多方陈述</button>
-            <button class="text-sm text-brand-dark underline-offset-4 hover:underline" @click="loadDemo">载入示例</button>
-          </div>
-
-          <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div class="flex items-start justify-between gap-4">
-              <div>
-                <h2 class="text-base font-semibold text-brand-dark">写作建议</h2>
-                <p class="mt-1 text-sm text-slate-600">时间、经过、各方动作、最终结果，按这个顺序写，判断最稳。</p>
-              </div>
-              <button class="text-sm text-slate-500" @click="showGuide = !showGuide">{{ showGuide ? '收起' : '展开' }}</button>
-            </div>
-            <div v-if="showGuide" class="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-3">
-              <p>别省略关键时间线，AI 很依赖上下文。</p>
-              <p>人物称呼要稳定，不要一会“他”一会“对象”。</p>
-              <p>如果你也有做错，照实写，结论才可信。</p>
-            </div>
-          </div>
-
-          <div v-if="mode === 'single'" class="mt-6">
-            <label class="field-label">完整描述</label>
-            <textarea v-model="singleContent" :maxlength="MAX_SINGLE" rows="12" autocomplete="off" placeholder="把来龙去脉写清楚。谁先说了什么、做了什么、为什么吵、现在卡在哪里，都可以写。" class="input-base mt-2 min-h-[280px] resize-y"></textarea>
-            <div class="mt-2 flex items-center justify-between text-sm">
-              <span class="text-slate-500">越完整越好，最低 {{ MIN_SINGLE }} 字即可提交。</span>
-              <span class="text-slate-400">{{ singleContent.length }}/{{ MAX_SINGLE }}</span>
-            </div>
-          </div>
-
-          <div v-else class="mt-6 space-y-4">
-            <div>
-              <label class="field-label">争议主题</label>
-              <input v-model="multiTopic" type="text" :maxlength="MAX_TOPIC" autocomplete="off" placeholder="例如：是否应该临时爽约去打游戏" class="input-base mt-2" />
-            </div>
-            <div class="flex items-center justify-between">
-              <p class="text-sm text-slate-500">至少 2 方，最多 {{ MAX_PARTIES }} 方。每一方只要能把观点说明白即可。</p>
-              <button v-if="perspectives.length < MAX_PARTIES" class="btn-secondary !px-4 !py-2 text-sm" @click="addPerspective">添加一方</button>
-            </div>
-            <div class="space-y-4">
-              <section v-for="(item, index) in perspectives" :key="`p-${index}`" class="rounded-2xl border border-slate-200 bg-white p-4">
-                <div class="flex items-center justify-between gap-3">
-                  <div class="flex items-center gap-3">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-dark text-sm font-semibold text-white">{{ index + 1 }}</span>
-                    <input v-model="item.name" maxlength="20" class="border-none bg-transparent p-0 text-base font-semibold text-brand-dark outline-none" :placeholder="`第${index + 1}方`" />
-                  </div>
-                  <button class="text-sm text-slate-500 hover:text-red-500" @click="removePerspective(index)">删除</button>
-                </div>
-                <textarea v-model="item.content" :maxlength="MAX_PERSPECTIVE" rows="6" autocomplete="off" :placeholder="`从${item.name || `第${index + 1}方`}的角度，把事实、感受和诉求写完整。`" class="input-base perspective-textarea mt-3 min-h-[180px] resize-y"></textarea>
-                <div class="mt-2 flex items-center justify-between text-sm">
-                  <span class="text-slate-500">最低 {{ MIN_PERSPECTIVE }} 字。重点是信息完整，不是凑字数。</span>
-                  <span class="text-slate-400">{{ item.content.length }}/{{ MAX_PERSPECTIVE }}</span>
-                </div>
-              </section>
-            </div>
-          </div>
-
-          <div v-if="error" class="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{{ error }}</div>
-
-          <div class="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-5 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p class="text-sm font-medium text-brand-dark">准备好了就提交。</p>
-              <p class="text-sm text-slate-500">系统会自动保存到你的历史记录，并生成可分享页面。</p>
-            </div>
-            <button class="btn-primary min-w-[180px]" :disabled="!canSubmit || loading" @click="submit">让 AI 评理</button>
+          <div class="mt-5 flex flex-wrap items-center gap-3">
+            <button :class="['mode-pill', mode === 'single' ? 'mode-pill--active' : '']" @click="mode = 'single'">我来讲完整经过</button>
+            <button :class="['mode-pill', mode === 'multi' ? 'mode-pill--active' : '']" @click="mode = 'multi'; if (perspectives.length === 0) { addPerspective(); addPerspective() }">双方各自讲</button>
+            <button class="text-sm text-brand-dark underline-offset-4 hover:underline" @click="loadDemo">看一个示例</button>
           </div>
         </div>
 
-        <aside class="space-y-4">
-          <div class="panel p-5">
-            <p class="text-sm font-semibold text-brand-dark">社区入口</p>
-            <p class="mt-2 text-sm leading-6 text-slate-600">想看别人最近的案例，或者给结果点踩点顶，直接去社区页。</p>
-            <router-link to="/community" class="btn-secondary mt-4 w-full">查看社区记录</router-link>
+        <div class="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3">
+          <div class="flex items-center justify-between gap-4">
+            <p class="text-sm font-medium text-brand-dark">不知道从哪开始写？照着这几句补充就够了。</p>
+            <button class="text-sm text-slate-500" @click="showGuide = !showGuide">{{ showGuide ? '收起' : '展开' }}</button>
           </div>
+          <div v-if="showGuide" class="mt-3 flex flex-wrap gap-2">
+            <span v-for="item in quickPrompts" :key="item" class="inline-flex rounded-full bg-white px-3 py-1.5 text-sm text-slate-600 shadow-sm">
+              {{ item }}
+            </span>
+          </div>
+          <p v-if="showGuide" class="mt-3 text-sm leading-6 text-slate-600">可直接照这个顺序写：昨晚几点，因为什么起冲突，我说了什么，对方怎么回，后来发生了什么，现在卡在哪里。</p>
+        </div>
 
-          <div class="panel p-5">
-            <div class="flex items-start justify-between gap-4">
-              <div>
-                <p class="text-sm font-semibold text-brand-dark">模型设置</p>
-                <p class="mt-2 text-sm leading-6 text-slate-600">默认优先用站点配置的服务端模型。你也可以填自己的 Key 覆盖。</p>
-              </div>
-              <button class="text-sm text-slate-500" @click="showApiSetup = !showApiSetup">{{ showApiSetup ? '收起' : '展开' }}</button>
-            </div>
-            <div class="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
-              <template v-if="apiConfigured">当前浏览器已保存 {{ getUserProvider() === 'deepseek' ? 'DeepSeek' : getUserProvider() === 'openai' ? 'OpenAI' : 'Gemini' }} Key</template>
-              <template v-else>当前未保存自定义 Key，提交时会先用站点服务端额度。</template>
-            </div>
-            <p v-if="apiSaveSuccess" class="mt-3 text-sm text-green-600">API Key 已保存。</p>
-            <Transition name="collapse">
-              <div v-if="showApiSetup" class="mt-4 border-t border-slate-200 pt-4">
-                <div class="grid grid-cols-3 gap-2">
-                  <button
-                    v-for="provider in [{ id: 'gemini', label: 'Gemini' }, { id: 'deepseek', label: 'DeepSeek' }, { id: 'openai', label: 'OpenAI' }]"
-                    :key="provider.id"
-                    @click="apiProvider = provider.id"
-                    :class="['rounded-xl border px-3 py-2 text-sm transition-colors', apiProvider === provider.id ? 'border-brand-dark bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600']"
-                  >
-                    {{ provider.label }}
-                  </button>
-                </div>
-                <input v-model="apiKeyInput" type="password" :placeholder="apiProvider === 'gemini' ? 'AIzaSy...' : 'sk-...'" class="input-base mt-4" autocomplete="off" @keyup.enter="handleSaveKey" />
-                <div class="mt-4 flex gap-3">
-                  <button class="btn-primary flex-1" :disabled="!apiKeyInput.trim()" @click="handleSaveKey">保存 Key</button>
-                  <button class="btn-secondary flex-1" :disabled="!apiConfigured" @click="handleClearKey">清除</button>
-                </div>
-                <p class="mt-3 text-xs leading-5 text-slate-500">你的 Key 只存在本地浏览器，不会写入数据库。推荐先用站点额度，额度耗尽时再填自己的。</p>
-              </div>
-            </Transition>
+        <div v-if="mode === 'single'" class="mt-6">
+          <label class="field-label">完整描述</label>
+          <textarea v-model="singleContent" :maxlength="MAX_SINGLE" rows="12" autocomplete="off" placeholder="例如：昨天晚上 10 点，我们因为周末安排吵起来。我想去见父母，对方临时说想和朋友打游戏。后面我说了什么、对方怎么回、最后怎么僵住了，都可以继续写。" class="input-base mt-2 min-h-[320px] resize-y text-base leading-7"></textarea>
+          <div class="mt-2 flex items-center justify-between text-sm">
+            <span class="text-slate-500">越完整越好，最低 {{ MIN_SINGLE }} 字即可提交。</span>
+            <span class="text-slate-400">{{ singleContent.length }}/{{ MAX_SINGLE }}</span>
           </div>
-        </aside>
+        </div>
+
+        <div v-else class="mt-6 space-y-4">
+          <div>
+            <label class="field-label">争议主题</label>
+            <input v-model="multiTopic" type="text" :maxlength="MAX_TOPIC" autocomplete="off" placeholder="例如：是否应该临时爽约去打游戏" class="input-base mt-2" />
+          </div>
+          <div class="flex items-center justify-between">
+            <p class="text-sm text-slate-500">至少 2 方，最多 {{ MAX_PARTIES }} 方。每一方只要把自己看到的事实和想法说明白就行。</p>
+            <button v-if="perspectives.length < MAX_PARTIES" class="btn-secondary !px-4 !py-2 text-sm" @click="addPerspective">添加一方</button>
+          </div>
+          <div class="space-y-4">
+            <section v-for="(item, index) in perspectives" :key="`p-${index}`" class="rounded-2xl border border-slate-200 bg-white p-4">
+              <div class="flex items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                  <span class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-dark text-sm font-semibold text-white">{{ index + 1 }}</span>
+                  <input v-model="item.name" maxlength="20" class="border-none bg-transparent p-0 text-base font-semibold text-brand-dark outline-none" :placeholder="`第${index + 1}方`" />
+                </div>
+                <button class="text-sm text-slate-500 hover:text-red-500" @click="removePerspective(index)">删除</button>
+              </div>
+              <textarea v-model="item.content" :maxlength="MAX_PERSPECTIVE" rows="6" autocomplete="off" :placeholder="`从${item.name || `第${index + 1}方`}的角度，把事实、感受和诉求写完整。`" class="input-base perspective-textarea mt-3 min-h-[180px] resize-y"></textarea>
+              <div class="mt-2 flex items-center justify-between text-sm">
+                <span class="text-slate-500">最低 {{ MIN_PERSPECTIVE }} 字。重点是信息完整，不是凑字数。</span>
+                <span class="text-slate-400">{{ item.content.length }}/{{ MAX_PERSPECTIVE }}</span>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div v-if="error" class="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{{ error }}</div>
+
+        <div class="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-5 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p class="text-sm font-medium text-brand-dark">写完就可以出结果。</p>
+            <p class="text-sm text-slate-500">系统会自动保存记录，并生成一页能直接分享给对方看的判断。</p>
+          </div>
+          <button class="btn-primary min-w-[220px]" :disabled="!canSubmit || loading" @click="submit">生成这次判断</button>
+        </div>
+
+        <div class="mt-8 border-t border-slate-200 pt-5">
+          <button class="text-sm font-medium text-slate-600 underline-offset-4 hover:text-brand-dark hover:underline" @click="showAdvanced = !showAdvanced">
+            {{ showAdvanced ? '收起其他入口' : '展开社区和模型设置' }}
+          </button>
+
+          <div v-if="showAdvanced" class="mt-4 grid gap-4 md:grid-cols-2">
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <p class="text-sm font-semibold text-brand-dark">社区入口</p>
+              <p class="mt-2 text-sm leading-6 text-slate-600">想看别人最近的案例，或者给结果点踩点顶，可以去社区页。</p>
+              <router-link to="/community" class="btn-secondary mt-4 w-full">查看社区记录</router-link>
+            </div>
+
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="text-sm font-semibold text-brand-dark">模型设置</p>
+                  <p class="mt-2 text-sm leading-6 text-slate-600">默认优先用站点配置的服务端模型。你也可以填自己的 Key 覆盖。</p>
+                </div>
+                <button class="text-sm text-slate-500" @click="showApiSetup = !showApiSetup">{{ showApiSetup ? '收起' : '展开' }}</button>
+              </div>
+              <div class="mt-3 rounded-xl bg-white px-3 py-2 text-sm text-slate-600">
+                <template v-if="apiConfigured">当前浏览器已保存 {{ getUserProvider() === 'deepseek' ? 'DeepSeek' : getUserProvider() === 'openai' ? 'OpenAI' : 'Gemini' }} Key</template>
+                <template v-else>当前未保存自定义 Key，提交时会先用站点服务端额度。</template>
+              </div>
+              <p v-if="apiSaveSuccess" class="mt-3 text-sm text-green-600">API Key 已保存。</p>
+              <Transition name="collapse">
+                <div v-if="showApiSetup" class="mt-4 border-t border-slate-200 pt-4">
+                  <div class="grid grid-cols-3 gap-2">
+                    <button
+                      v-for="provider in [{ id: 'gemini', label: 'Gemini' }, { id: 'deepseek', label: 'DeepSeek' }, { id: 'openai', label: 'OpenAI' }]"
+                      :key="provider.id"
+                      @click="apiProvider = provider.id"
+                      :class="['rounded-xl border px-3 py-2 text-sm transition-colors', apiProvider === provider.id ? 'border-brand-dark bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600']"
+                    >
+                      {{ provider.label }}
+                    </button>
+                  </div>
+                  <input v-model="apiKeyInput" type="password" :placeholder="apiProvider === 'gemini' ? 'AIzaSy...' : 'sk-...'" class="input-base mt-4" autocomplete="off" @keyup.enter="handleSaveKey" />
+                  <div class="mt-4 flex gap-3">
+                    <button class="btn-primary flex-1" :disabled="!apiKeyInput.trim()" @click="handleSaveKey">保存 Key</button>
+                    <button class="btn-secondary flex-1" :disabled="!apiConfigured" @click="handleClearKey">清除</button>
+                  </div>
+                  <p class="mt-3 text-xs leading-5 text-slate-500">你的 Key 只存在本地浏览器，不会写入数据库。推荐先用站点额度，额度耗尽时再填自己的。</p>
+                </div>
+              </Transition>
+            </div>
+          </div>
+        </div>
       </section>
     </div>
   </div>

@@ -42,7 +42,6 @@ Then configure one or more AI providers:
 
 ```env
 GEMINI_API_KEY=...
-GEMINI_MODEL=gemini-2.0-flash
 ```
 
 ```env
@@ -57,6 +56,7 @@ OPENAI_MODEL=gpt-4o-mini
 OPENAI_BASE_URL=https://api.openai.com
 ```
 
+Gemini model is already defaulted in code to `gemini-2.0-flash`.
 Lowercase keys such as `gemini_api_key` are also accepted, but uppercase is recommended.
 
 ## 3. Vercel Project Settings

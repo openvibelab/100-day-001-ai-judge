@@ -16,16 +16,26 @@
 @layer components {
   .page-surface {
     background:
-      radial-gradient(circle at top left, rgba(255, 255, 255, 0.9), transparent 35%),
+      radial-gradient(circle at top left, rgba(255, 232, 214, 0.78), transparent 26%),
+      radial-gradient(circle at top right, rgba(219, 234, 254, 0.7), transparent 22%),
+      linear-gradient(135deg, rgba(15, 23, 42, 0.02) 25%, transparent 25%) 0 0 / 22px 22px,
       linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
   }
 
   .panel {
     @apply rounded-3xl border border-white/70 bg-white shadow-soft;
+    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.05), 0 2px 10px rgba(15, 23, 42, 0.04);
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-2xl bg-brand-dark px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex items-center justify-center rounded-2xl px-6 py-3 text-sm font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-40;
+    background: linear-gradient(135deg, #16213e 0%, #23355f 100%);
+    box-shadow: 0 14px 26px rgba(22, 33, 62, 0.18);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 18px 34px rgba(22, 33, 62, 0.22);
   }
 
   .btn-secondary {
@@ -49,7 +59,9 @@
   }
 
   .stats-chip {
-    @apply rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-right;
+    @apply rounded-2xl border border-slate-200 px-4 py-3 text-right;
+    background: linear-gradient(180deg, #fff8f3 0%, #ffffff 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
   }
 
   .stats-chip__label {
@@ -65,7 +77,12 @@
   }
 
   .vote-btn {
-    @apply inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:text-brand-dark disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition-all hover:border-slate-400 hover:text-brand-dark disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .vote-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
   }
 
   .loading-mark {

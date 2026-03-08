@@ -31,6 +31,15 @@ onMounted(async () => {
 const result = computed(() => caseData.value?.result || {})
 const inputData = computed(() => caseData.value?.input || {})
 const sortedScores = computed(() => Object.entries(result.value.scores || {}).sort((a, b) => b[1] - a[1]))
+const evidencePoints = computed(() => {
+  const text = result.value.analysis || ''
+  return text
+    .split(/\n+/)
+    .flatMap((line) => line.split(/(?<=[。！？])/))
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 5)
+})
 const winner = computed(() => {
   if (result.value.winner && result.value.winner !== '难分高下') return result.value.winner
   if (sortedScores.value.length >= 2 && sortedScores.value[0][1] - sortedScores.value[1][1] >= 10) return sortedScores.value[0][0]
@@ -127,6 +136,16 @@ function formatInputBlock(entry) {
           </section>
 
           <section class="panel p-6">
+            <h2 class="text-lg font-semibold text-brand-dark">这份判断依据什么得出</h2>
+            <div class="mt-4 grid gap-3">
+              <div v-for="(item, index) in evidencePoints" :key="`${index}-${item}`" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p class="text-xs uppercase tracking-[0.18em] text-slate-500">依据 {{ index + 1 }}</p>
+                <p class="mt-2 text-sm leading-7 text-slate-700">{{ item }}</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel p-6">
             <div class="flex items-center justify-between gap-3">
               <div>
                 <h2 class="text-lg font-semibold text-brand-dark">先核对原始输入</h2>
@@ -173,7 +192,7 @@ function formatInputBlock(entry) {
           </section>
 
           <section class="panel p-6">
-            <h2 class="text-lg font-semibold text-brand-dark">分析</h2>
+            <h2 class="text-lg font-semibold text-brand-dark">完整分析</h2>
             <p class="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">{{ result.analysis }}</p>
           </section>
 
