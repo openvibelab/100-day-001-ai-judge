@@ -1,9 +1,4 @@
-// AI Judge API layer
-// Priority: user-provided key (encouraged) > server free quota (fallback)
-
 const API_URL = import.meta.env.VITE_AI_API_URL || '/api/judge'
-
-// ---- User API key management ----
 
 const KEY_STORAGE = 'aj_user_api_key'
 const PROVIDER_STORAGE = 'aj_user_provider'
@@ -13,7 +8,7 @@ export function getUserApiKey() {
 }
 
 export function getUserProvider() {
-  return localStorage.getItem(PROVIDER_STORAGE) || 'deepseek'
+  return localStorage.getItem(PROVIDER_STORAGE) || 'gemini'
 }
 
 export function saveUserApiKey(key, provider) {
@@ -30,15 +25,12 @@ export function hasUserApiKey() {
   return !!getUserApiKey()
 }
 
-// ---- Request judgment ----
-
 export async function requestJudgment(payload) {
-  const systemPrompt = buildSystemPrompt()
-  const userPrompt = buildUserPrompt(payload)
+  const body = {
+    system: buildSystemPrompt(),
+    user: buildUserPrompt(payload),
+  }
 
-  const body = { system: systemPrompt, user: userPrompt }
-
-  // Always send user key if available
   const userKey = getUserApiKey()
   if (userKey) {
     body.userApiKey = userKey
@@ -54,7 +46,7 @@ export async function requestJudgment(payload) {
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
     if (data.code === 'QUOTA_EXCEEDED') {
-      const err = new Error(data.error || '免费额度已用完')
+      const err = new Error(data.error || '默认额度已用完')
       err.code = 'QUOTA_EXCEEDED'
       throw err
     }
@@ -71,36 +63,36 @@ export async function requestJudgment(payload) {
 }
 
 function buildSystemPrompt() {
-  return `你是一个公正客观、说话有趣的争议调解 AI。你的任务是分析争吵/矛盾事件，给出客观评理。
+  return `你是一个公正、克制、会讲人话的争议分析助手。你的任务是分析争吵或矛盾事件，给出清晰、可信、可复核的评理结果。
 
-你的输出必须严格按照以下 JSON 格式（不要输出其他内容）：
+你必须严格输出 JSON，不要输出 JSON 以外的内容：
 
 {
-  "summary": "一句话总结（8字以内，要有趣）",
-  "winner": "更有理的一方名称。如果势均力敌就写'难分高下'",
-  "verdict": "最终裁定（25字以内，简洁有力）",
-  "analysis": "客观分析各方对错，有理有据，250字以内。分段论述。",
+  "summary": "一句话总结，建议 8 到 20 个字",
+  "winner": "更有理的一方名称；如果差距不明显就写'难分高下'",
+  "verdict": "最终裁定，建议 20 到 60 个字",
+  "analysis": "分点说明为什么这样判断，允许充分展开，但要紧扣事实",
   "scores": { "甲方": 70, "乙方": 30 },
-  "advice": "给双方的实用建议，如何化解矛盾，120字以内"
+  "advice": "给双方的具体建议，允许 80 到 220 个字"
 }
 
 规则：
-- scores 是各方"有道理"的比例，总和为100
-- 如果有多方，scores 包含所有人
-- winner 是 scores 最高的人名。差距小于10分时写"难分高下"
-- 保持中立客观，但语气可以稍微幽默
-- 用通俗生动的中文，像朋友聊天一样
-- 不要道德绑架
-- 如果信息不足以判断，在 analysis 中指出`
+- scores 表示“有理程度”，总和必须为 100
+- 如果有多方，scores 必须覆盖所有人
+- 如果第一名与第二名差距小于 10 分，winner 写“难分高下”
+- 先基于用户提供的事实判断，不要脑补不存在的证据
+- 语言要自然、明确、少废话，不要爹味说教
+- 如果信息不足，要在 analysis 中明确指出缺口`
 }
 
 function buildUserPrompt(payload) {
   if (payload.mode === 'single') {
-    return `请分析以下争吵事件并给出评理：\n\n${payload.content}`
+    return `请分析以下争议并给出评理结果：\n\n${payload.content}`
   }
-  let text = `争执主题：${payload.topic}\n\n`
-  payload.perspectives.forEach((p) => {
-    text += `【${p.name}的视角】\n${p.content}\n\n`
+
+  let text = `争议主题：${payload.topic}\n\n`
+  payload.perspectives.forEach((item) => {
+    text += `【${item.name}的视角】\n${item.content}\n\n`
   })
   text += '请综合以上各方视角，给出客观评理。'
   return text

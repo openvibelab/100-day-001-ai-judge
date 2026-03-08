@@ -38,30 +38,26 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-And one AI provider:
+Then configure one or more AI providers:
 
 ```env
 GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-2.0-flash
 ```
-
-or
-
-```env
-OPENAI_API_KEY=...
-```
-
-or
 
 ```env
 DEEPSEEK_API_KEY=...
+DEEPSEEK_MODEL=deepseek-chat
+DEEPSEEK_BASE_URL=https://api.deepseek.com
 ```
-
-Optional:
 
 ```env
-AI_MODEL=...
-AI_BASE_URL=...
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_BASE_URL=https://api.openai.com
 ```
+
+Lowercase keys such as `gemini_api_key` are also accepted, but uppercase is recommended.
 
 ## 3. Vercel Project Settings
 
@@ -75,4 +71,5 @@ AI_BASE_URL=...
 1. Submit a test case from the homepage.
 2. Open the generated result page.
 3. Confirm a new row exists in `public.cases`.
-4. In browser devtools, confirm app requests only your `/api/*` endpoints for data access.
+4. Visit `/community` and confirm the case appears.
+5. Click thumbs up or thumbs down and confirm a new row exists in `public.votes`.

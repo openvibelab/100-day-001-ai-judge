@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { getMyHistory } from '../data/supabase.js'
 
 const cases = ref([])
@@ -12,8 +12,7 @@ onMounted(async () => {
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
-  const d = new Date(dateStr)
-  return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
+  return new Date(dateStr).toLocaleString()
 }
 
 function topParty(result) {
@@ -23,39 +22,48 @@ function topParty(result) {
 </script>
 
 <template>
-  <div class="max-w-lg mx-auto px-4 py-5 md:py-8">
-    <div class="flex items-center justify-between mb-5">
-      <h1 class="text-lg font-bold text-brand-dark">我的记录</h1>
-      <router-link to="/" class="text-sm text-brand-orange hover:underline font-medium">去评理 →</router-link>
-    </div>
-
-    <div v-if="loading" class="text-center py-20 text-gray-300 text-sm">加载中...</div>
-
-    <div v-else-if="cases.length === 0" class="text-center py-20">
-      <div class="text-4xl mb-3 opacity-50">📋</div>
-      <p class="text-gray-400 text-sm mb-5">还没有评理记录</p>
-      <router-link to="/" class="btn-primary text-sm">去评理 →</router-link>
-    </div>
-
-    <div v-else class="space-y-2.5">
-      <router-link v-for="c in cases" :key="c.id" :to="`/result/${c.id}`"
-        class="card-hover p-4 block group">
-        <div class="flex items-center justify-between gap-3">
-          <div class="flex-1 min-w-0">
-            <p class="font-semibold text-sm truncate group-hover:text-brand-orange transition-colors">
-              {{ c.result?.summary || '评理记录' }}
-            </p>
-            <p class="text-[11px] text-gray-300 truncate mt-0.5">{{ c.result?.verdict }}</p>
-          </div>
-          <div class="text-right shrink-0">
-            <template v-if="topParty(c.result)">
-              <p class="text-sm font-bold text-gradient">{{ topParty(c.result)[1] }}%</p>
-              <p class="text-[10px] text-gray-300">{{ topParty(c.result)[0] }}</p>
-            </template>
-            <p class="text-[10px] text-gray-200 mt-0.5">{{ formatDate(c.created_at) }}</p>
-          </div>
+  <div class="page-surface min-h-full">
+    <div class="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-10">
+      <div class="mb-6 flex items-end justify-between gap-4">
+        <div>
+          <p class="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">Personal Archive</p>
+          <h1 class="mt-2 text-3xl font-semibold tracking-tight text-brand-dark">我的历史记录</h1>
         </div>
-      </router-link>
+        <router-link to="/" class="btn-secondary">返回首页</router-link>
+      </div>
+
+      <div v-if="loading" class="py-24 text-center text-sm text-slate-500">正在加载</div>
+
+      <div v-else-if="cases.length === 0" class="panel py-20 text-center">
+        <h2 class="text-2xl font-semibold text-brand-dark">还没有记录</h2>
+        <p class="mt-3 text-slate-600">你每次提交后的裁定页，都会自动保存在这里。</p>
+        <router-link to="/" class="btn-primary mt-6">去评理</router-link>
+      </div>
+
+      <div v-else class="space-y-4">
+        <router-link
+          v-for="item in cases"
+          :key="item.id"
+          :to="`/result/${item.id}`"
+          class="panel block p-5 transition-transform hover:-translate-y-0.5"
+        >
+          <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div class="min-w-0 flex-1">
+              <p class="text-xl font-semibold text-brand-dark">{{ item.result?.summary || '评理记录' }}</p>
+              <p class="mt-2 text-sm leading-7 text-slate-700">{{ item.result?.verdict || '暂无裁定摘要' }}</p>
+              <p class="mt-3 text-sm leading-7 text-slate-600">{{ item.result?.analysis || '' }}</p>
+            </div>
+            <div class="w-full shrink-0 rounded-2xl bg-slate-50 p-4 md:w-56">
+              <p class="text-xs uppercase tracking-[0.18em] text-slate-500">顶部结论</p>
+              <div v-if="topParty(item.result)" class="mt-3">
+                <p class="text-2xl font-semibold text-brand-dark">{{ topParty(item.result)[1] }}%</p>
+                <p class="mt-1 text-sm text-slate-600">{{ topParty(item.result)[0] }}</p>
+              </div>
+              <p class="mt-4 text-xs text-slate-500">{{ formatDate(item.created_at) }}</p>
+            </div>
+          </div>
+        </router-link>
+      </div>
     </div>
   </div>
 </template>

@@ -1,32 +1,27 @@
-<script setup>
-</script>
-
 <template>
   <div class="min-h-screen flex flex-col">
-    <!-- Header -->
-    <header class="py-3 px-4 sticky top-0 z-50 bg-brand-cream/80 backdrop-blur-md">
-      <div class="max-w-lg mx-auto flex items-center justify-between">
-        <router-link to="/" class="flex items-center gap-1.5 group">
-          <span class="text-lg">⚖️</span>
-          <span class="font-bold text-brand-dark text-sm group-hover:text-brand-orange transition-colors">AI 评理</span>
+    <header class="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur-md">
+      <div class="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 md:px-6">
+        <router-link to="/" class="flex items-center gap-3">
+          <span class="flex h-9 w-9 items-center justify-center rounded-full bg-brand-dark text-sm font-semibold text-white">判</span>
+          <div>
+            <p class="text-sm font-semibold text-brand-dark">AI 吵架评理</p>
+            <p class="text-xs text-slate-500">把事情说清楚，再让系统裁</p>
+          </div>
         </router-link>
-        <router-link
-          to="/history"
-          class="text-xs text-gray-400 hover:text-brand-orange transition-colors px-3 py-1.5 rounded-full hover:bg-brand-orange/5"
-        >
-          📋 记录
-        </router-link>
+        <nav class="flex items-center gap-2 text-sm">
+          <router-link to="/community" class="nav-link">社区</router-link>
+          <router-link to="/history" class="nav-link">历史</router-link>
+        </nav>
       </div>
     </header>
 
-    <!-- Main -->
     <main class="flex-1">
       <router-view />
     </main>
 
-    <!-- Footer -->
-    <footer class="py-5 text-center text-[11px] text-gray-300/80">
-      <a href="https://openvibelab.com" target="_blank" class="hover:text-brand-orange transition-colors">OpenVibeLab</a>
+    <footer class="border-t border-slate-200 py-6 text-center text-sm text-slate-500">
+      <a href="https://openvibelab.com" target="_blank" class="hover:text-brand-dark transition-colors">OpenVibeLab</a>
       · 开源免费
     </footer>
   </div>

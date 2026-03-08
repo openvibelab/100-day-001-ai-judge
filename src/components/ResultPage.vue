@@ -1,181 +1,214 @@
 <script setup>
-import { ref, onMounted, computed, nextTick } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { getCase } from '../data/supabase.js'
+import { getCase, getVotes, voteCase } from '../data/supabase.js'
 
 const route = useRoute()
 const caseData = ref(null)
 const loading = ref(true)
 const notFound = ref(false)
 const copied = ref(false)
-const showInput = ref(false)
-const animateScores = ref(false)
+const showInput = ref(true)
+const votes = ref({ up: 0, down: 0 })
+const voting = ref(false)
+
+const votedKey = computed(() => `aj_vote_${route.params.id}`)
 
 onMounted(async () => {
   const data = await getCase(route.params.id)
-  if (data) {
-    caseData.value = data
-    document.title = `${data.result?.summary || '评理结果'} · AI 吵架评理`
-    await nextTick()
-    requestAnimationFrame(() => { animateScores.value = true })
-  } else {
+  if (!data) {
     notFound.value = true
+    loading.value = false
+    return
   }
+
+  caseData.value = data
+  document.title = `${data.result?.summary || '评理结果'} · AI 吵架评理`
+  votes.value = await getVotes(route.params.id)
   loading.value = false
 })
 
 const result = computed(() => caseData.value?.result || {})
 const inputData = computed(() => caseData.value?.input || {})
-const scores = computed(() => result.value.scores || {})
-const sortedScores = computed(() => Object.entries(scores.value).sort((a, b) => b[1] - a[1]))
-
+const sortedScores = computed(() => Object.entries(result.value.scores || {}).sort((a, b) => b[1] - a[1]))
 const winner = computed(() => {
   if (result.value.winner && result.value.winner !== '难分高下') return result.value.winner
-  const s = sortedScores.value
-  if (s.length >= 2 && s[0][1] - s[1][1] >= 10) return s[0][0]
-  return null
+  if (sortedScores.value.length >= 2 && sortedScores.value[0][1] - sortedScores.value[1][1] >= 10) return sortedScores.value[0][0]
+  return '难分高下'
 })
-const isDraw = computed(() => {
-  const s = sortedScores.value
-  return s.length >= 2 && Math.abs(s[0][1] - s[1][1]) < 10
+const hasVoted = computed(() => {
+  try {
+    return !!localStorage.getItem(votedKey.value)
+  } catch {
+    return false
+  }
 })
 
-function shareUrl() { return window.location.href }
+function shareUrl() {
+  return window.location.href
+}
 
 async function copyLink() {
-  try { await navigator.clipboard.writeText(shareUrl()) } catch {
-    const el = document.createElement('input'); el.value = shareUrl()
-    document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el)
+  try {
+    await navigator.clipboard.writeText(shareUrl())
+  } catch {
+    const el = document.createElement('input')
+    el.value = shareUrl()
+    document.body.appendChild(el)
+    el.select()
+    document.execCommand('copy')
+    document.body.removeChild(el)
   }
   copied.value = true
-  setTimeout(() => (copied.value = false), 2000)
+  setTimeout(() => {
+    copied.value = false
+  }, 2000)
+}
+
+async function castVote(type) {
+  if (hasVoted.value || voting.value) return
+  voting.value = true
+  await voteCase(route.params.id, type)
+  votes.value = await getVotes(route.params.id)
+  try {
+    localStorage.setItem(votedKey.value, type)
+  } catch {
+    // ignore
+  }
+  voting.value = false
+}
+
+function shareText() {
+  const lead = sortedScores.value[0]
+  return `AI评理：${result.value.summary || '已出结果'}｜${lead ? `${lead[0]} ${lead[1]}%` : ''}`
 }
 
 async function nativeShare() {
-  const text = `AI 评理：${result.value.summary}｜${sortedScores.value[0]?.[0]} ${sortedScores.value[0]?.[1]}%`
   if (navigator.share) {
-    try { await navigator.share({ title: 'AI 吵架评理', text, url: shareUrl() }) } catch {}
-  } else { copyLink() }
+    try {
+      await navigator.share({ title: 'AI 吵架评理', text: shareText(), url: shareUrl() })
+      return
+    } catch {
+      // ignore
+    }
+  }
+  await copyLink()
 }
 
-const SCORE_COLORS = ['from-brand-orange to-brand-orange-light', 'from-brand-blue to-blue-400', 'from-brand-teal to-teal-400', 'from-yellow-500 to-amber-400', 'from-purple-500 to-purple-400', 'from-pink-500 to-pink-400']
-const BADGE_COLORS = ['bg-brand-orange', 'bg-brand-blue', 'bg-brand-teal', 'bg-yellow-500', 'bg-purple-500', 'bg-pink-500']
+function formatInputBlock(entry) {
+  return entry?.trim?.() || '未提供'
+}
 </script>
 
 <template>
-  <div class="max-w-lg mx-auto px-4 py-5 md:py-8">
-
-    <!-- Loading -->
-    <div v-if="loading" class="text-center py-24">
-      <div class="text-5xl mb-4 animate-bounce" style="animation-duration: 1.5s">⚖️</div>
-      <p class="text-gray-300 text-sm">加载中...</p>
-    </div>
-
-    <!-- Not found -->
-    <div v-else-if="notFound" class="text-center py-24">
-      <div class="text-5xl mb-4">🤷</div>
-      <h2 class="text-lg font-bold mb-1">找不到这条记录</h2>
-      <p class="text-gray-400 text-sm mb-6">链接可能不对，或记录已过期</p>
-      <router-link to="/" class="btn-primary text-sm">去评理 →</router-link>
-    </div>
-
-    <!-- Result -->
-    <div v-else>
-      <!-- ===== Hero verdict ===== -->
-      <div class="text-center mb-6 animate-scale-in">
-        <p class="text-[11px] text-gray-300 uppercase tracking-widest mb-3 font-medium">AI 裁定</p>
-
-        <!-- Winner -->
-        <div v-if="winner" class="mb-3">
-          <div class="inline-block rounded-3xl px-8 py-4" style="background: linear-gradient(135deg, #fff5f0 0%, #ffeee5 100%)">
-            <span class="text-3xl md:text-4xl font-black text-gradient">{{ winner }} 更有理</span>
-          </div>
-        </div>
-        <!-- Draw -->
-        <div v-else-if="isDraw" class="mb-3">
-          <div class="inline-block bg-gray-50 rounded-3xl px-8 py-4">
-            <span class="text-3xl md:text-4xl font-black text-gray-500">难分高下</span>
-          </div>
-        </div>
-
-        <p class="text-gray-400 text-sm mt-2">{{ result.summary }}</p>
+  <div class="page-surface min-h-full">
+    <div class="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-10">
+      <div v-if="loading" class="py-24 text-center">
+        <div class="loading-mark mx-auto">判</div>
+        <p class="mt-5 text-sm text-slate-500">正在加载结果</p>
       </div>
 
-      <!-- ===== Score battle ===== -->
-      <div class="card p-5 mb-3 animate-slide-up" style="animation-delay: 0.15s">
+      <div v-else-if="notFound" class="panel py-20 text-center">
+        <h2 class="text-2xl font-semibold text-brand-dark">找不到这条记录</h2>
+        <p class="mt-3 text-slate-600">链接可能有误，或者数据没有成功保存。</p>
+        <router-link to="/" class="btn-primary mt-6">返回首页</router-link>
+      </div>
+
+      <div v-else class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         <div class="space-y-5">
-          <div v-for="([name, score], idx) in sortedScores" :key="name">
-            <div class="flex justify-between items-end mb-2">
-              <div class="flex items-center gap-2">
-                <span :class="['w-6 h-6 rounded-lg text-white text-[11px] font-bold flex items-center justify-center', BADGE_COLORS[idx] || 'bg-gray-400']">
-                  {{ idx === 0 && !isDraw ? '👑' : idx + 1 }}
-                </span>
-                <span class="font-bold">{{ name }}</span>
-              </div>
-              <span class="text-3xl font-black tabular-nums text-gradient">
-                {{ score }}<span class="text-base text-gray-300">%</span>
-              </span>
+          <section class="panel p-6 md:p-8">
+            <p class="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">裁定结果</p>
+            <h1 class="mt-3 text-3xl font-semibold tracking-tight text-brand-dark md:text-4xl">{{ result.summary || '评理完成' }}</h1>
+            <div class="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-600">
+              <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 font-medium text-brand-dark">裁定：{{ winner }}</span>
+              <span v-if="caseData?.created_at">生成于 {{ new Date(caseData.created_at).toLocaleString() }}</span>
             </div>
-            <div class="h-3 bg-gray-100 rounded-full overflow-hidden">
-              <div :class="['h-full rounded-full bg-gradient-to-r transition-all ease-out', SCORE_COLORS[idx] || 'from-gray-400 to-gray-300']"
-                :style="{ width: animateScores ? score + '%' : '0%', transitionDuration: '1.2s', transitionDelay: (0.4 + idx * 0.2) + 's' }">
+            <p class="mt-5 text-lg leading-8 text-slate-700">{{ result.verdict }}</p>
+          </section>
+
+          <section class="panel p-6">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h2 class="text-lg font-semibold text-brand-dark">先核对原始输入</h2>
+                <p class="mt-1 text-sm text-slate-600">先确认 AI 理解的是不是你真正提交的内容。</p>
               </div>
+              <button class="text-sm text-slate-500" @click="showInput = !showInput">{{ showInput ? '收起' : '展开' }}</button>
+            </div>
+
+            <div v-if="showInput" class="mt-5 space-y-4">
+              <template v-if="inputData.mode === 'single'">
+                <div class="rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-700 whitespace-pre-line">
+                  {{ formatInputBlock(inputData.content) }}
+                </div>
+              </template>
+              <template v-else>
+                <div class="rounded-2xl bg-slate-50 p-4">
+                  <p class="text-xs uppercase tracking-[0.18em] text-slate-500">争议主题</p>
+                  <p class="mt-2 text-sm leading-7 text-slate-700">{{ formatInputBlock(inputData.topic) }}</p>
+                </div>
+                <div v-for="entry in inputData.perspectives || []" :key="entry.name" class="rounded-2xl border border-slate-200 p-4">
+                  <p class="text-sm font-semibold text-brand-dark">{{ entry.name }}</p>
+                  <p class="mt-2 text-sm leading-7 text-slate-700 whitespace-pre-line">{{ formatInputBlock(entry.content) }}</p>
+                </div>
+              </template>
+            </div>
+          </section>
+
+          <section class="panel p-6">
+            <h2 class="text-lg font-semibold text-brand-dark">有理程度</h2>
+            <div class="mt-5 space-y-5">
+              <div v-for="([name, score], index) in sortedScores" :key="name">
+                <div class="mb-2 flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-dark text-sm font-semibold text-white">{{ index + 1 }}</span>
+                    <span class="text-base font-medium text-slate-800">{{ name }}</span>
+                  </div>
+                  <span class="text-2xl font-semibold text-brand-dark">{{ score }}%</span>
+                </div>
+                <div class="h-3 overflow-hidden rounded-full bg-slate-200">
+                  <div class="h-full rounded-full bg-brand-orange" :style="{ width: `${score}%` }"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel p-6">
+            <h2 class="text-lg font-semibold text-brand-dark">分析</h2>
+            <p class="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">{{ result.analysis }}</p>
+          </section>
+
+          <section class="panel p-6">
+            <h2 class="text-lg font-semibold text-brand-dark">建议</h2>
+            <p class="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">{{ result.advice }}</p>
+          </section>
+        </div>
+
+        <aside class="space-y-4">
+          <div class="panel p-5">
+            <p class="text-sm font-semibold text-brand-dark">分享这条裁定</p>
+            <p class="mt-2 text-sm leading-6 text-slate-600">复制链接发给对方，或者直接用系统分享。</p>
+            <div class="mt-4 flex gap-3">
+              <button class="btn-primary flex-1" @click="nativeShare">{{ copied ? '已复制' : '分享结果' }}</button>
+              <router-link to="/" class="btn-secondary flex-1">再评一次</router-link>
             </div>
           </div>
-        </div>
-      </div>
 
-      <!-- ===== Verdict ===== -->
-      <div class="card p-5 mb-3 animate-slide-up" style="animation-delay: 0.25s; border-left: 3px solid #ff6b35">
-        <h3 class="text-[11px] text-gray-300 uppercase tracking-wider font-bold mb-2">裁定</h3>
-        <p class="text-base leading-relaxed font-semibold text-gray-800">{{ result.verdict }}</p>
-      </div>
-
-      <!-- ===== Analysis ===== -->
-      <div class="card p-5 mb-3 animate-slide-up" style="animation-delay: 0.35s">
-        <h3 class="text-[11px] text-gray-300 uppercase tracking-wider font-bold mb-2">分析</h3>
-        <p class="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{{ result.analysis }}</p>
-      </div>
-
-      <!-- ===== Advice ===== -->
-      <div class="card p-5 mb-5 animate-slide-up" style="animation-delay: 0.45s; background: linear-gradient(135deg, #f0fffe 0%, #f8fffe 100%); border: 1px solid rgba(78,205,196,0.15)">
-        <h3 class="text-[11px] text-brand-teal uppercase tracking-wider font-bold mb-2">💡 建议</h3>
-        <p class="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{{ result.advice }}</p>
-      </div>
-
-      <!-- ===== Share CTA ===== -->
-      <div class="card p-5 text-center mb-3 animate-slide-up" style="animation-delay: 0.55s">
-        <p class="font-bold text-base mb-0.5">把结果甩给 TA 看</p>
-        <p class="text-[11px] text-gray-300 mb-4">让 TA 心服口服 😏</p>
-        <div class="flex gap-2.5 justify-center">
-          <button @click="nativeShare" class="btn-primary text-sm !py-2.5 flex-1 max-w-[160px]">
-            {{ copied ? '✅ 已复制' : '📤 分享结果' }}
-          </button>
-          <router-link to="/" class="btn-secondary text-sm !py-2.5 flex-1 max-w-[160px]">再来一次</router-link>
-        </div>
-      </div>
-
-      <!-- ===== Original input ===== -->
-      <div class="card overflow-hidden animate-slide-up" style="animation-delay: 0.6s">
-        <button @click="showInput = !showInput"
-          class="w-full p-4 text-left flex items-center justify-between text-[11px] text-gray-300 hover:text-gray-500 transition-colors">
-          <span>📄 原始输入</span>
-          <span class="transition-transform duration-200" :class="showInput ? 'rotate-180' : ''">▼</span>
-        </button>
-        <Transition name="collapse">
-          <div v-if="showInput" class="px-5 pb-5 text-sm text-gray-500 leading-relaxed">
-            <template v-if="inputData.mode === 'single'">
-              <p class="whitespace-pre-line">{{ inputData.content }}</p>
-            </template>
-            <template v-else>
-              <p class="font-medium text-gray-600 mb-3 text-xs">主题：{{ inputData.topic }}</p>
-              <div v-for="p in inputData.perspectives" :key="p.name" class="mb-3">
-                <p class="font-medium text-gray-600 text-xs">{{ p.name }}：</p>
-                <p class="whitespace-pre-line pl-3 border-l-2 border-gray-100 mt-1 text-xs">{{ p.content }}</p>
-              </div>
-            </template>
+          <div class="panel p-5">
+            <p class="text-sm font-semibold text-brand-dark">这条结果靠谱吗？</p>
+            <p class="mt-2 text-sm leading-6 text-slate-600">可以直接点赞或点踩。每个浏览器对每条记录只计一次。</p>
+            <div class="mt-4 grid grid-cols-2 gap-3">
+              <button class="vote-btn" :disabled="hasVoted || voting" @click="castVote('up')">👍 有帮助 {{ votes.up }}</button>
+              <button class="vote-btn" :disabled="hasVoted || voting" @click="castVote('down')">👎 不认可 {{ votes.down }}</button>
+            </div>
+            <p v-if="hasVoted" class="mt-3 text-xs text-slate-500">你已经投过票了。</p>
           </div>
-        </Transition>
+
+          <div class="panel p-5">
+            <p class="text-sm font-semibold text-brand-dark">社区记录</p>
+            <p class="mt-2 text-sm leading-6 text-slate-600">所有公开保存的案例都会进入社区列表，按最新时间排序。</p>
+            <router-link to="/community" class="btn-secondary mt-4 w-full">去社区看看</router-link>
+          </div>
+        </aside>
       </div>
     </div>
   </div>

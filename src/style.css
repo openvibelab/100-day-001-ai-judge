@@ -3,103 +3,113 @@
 @tailwind utilities;
 
 @layer base {
-  html { scroll-behavior: smooth; }
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
-    @apply text-gray-800 antialiased;
-    background: linear-gradient(165deg, #fef9f4 0%, #f8f6f3 40%, #f3f0ed 100%);
-    min-height: 100vh;
+    @apply bg-slate-100 text-slate-900 antialiased;
+    font-feature-settings: "ss01" 1;
   }
 }
 
 @layer components {
+  .page-surface {
+    background:
+      radial-gradient(circle at top left, rgba(255, 255, 255, 0.9), transparent 35%),
+      linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+  }
+
+  .panel {
+    @apply rounded-3xl border border-white/70 bg-white shadow-soft;
+  }
+
   .btn-primary {
-    @apply inline-flex items-center justify-center px-6 py-3 rounded-2xl
-           bg-gradient-to-r from-brand-orange to-brand-orange-light
-           text-white font-bold
-           transition-all duration-300 ease-out
-           hover:shadow-glow-orange active:scale-[0.97]
-           disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 disabled:shadow-none;
+    @apply inline-flex items-center justify-center rounded-2xl bg-brand-dark px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40;
   }
+
   .btn-secondary {
-    @apply inline-flex items-center justify-center px-6 py-3 rounded-2xl
-           bg-white border border-gray-200 text-gray-600 font-semibold
-           transition-all duration-300
-           hover:border-brand-orange hover:text-brand-orange
-           active:scale-[0.97];
+    @apply inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-6 py-3 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:text-brand-dark disabled:cursor-not-allowed disabled:opacity-40;
   }
+
   .input-base {
-    @apply w-full px-4 py-3 rounded-2xl bg-white/80 border border-gray-200/80
-           focus:outline-none focus:ring-2 focus:ring-brand-orange/20 focus:border-brand-orange/50
-           focus:bg-white
-           transition-all duration-200 text-[15px] placeholder:text-gray-300;
+    @apply w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-[15px] text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-brand-dark focus:ring-4 focus:ring-slate-200;
   }
-  .card {
-    @apply bg-white/90 backdrop-blur-sm rounded-3xl border border-white/60 shadow-soft;
+
+  .field-label {
+    @apply text-sm font-semibold text-brand-dark;
   }
-  .card-hover {
-    @apply card transition-all duration-300 hover:shadow-soft-lg hover:border-brand-orange/20 hover:-translate-y-0.5;
+
+  .mode-pill {
+    @apply rounded-full border border-slate-300 bg-white px-4 py-2 text-sm text-slate-600 transition-colors hover:border-slate-400 hover:text-brand-dark;
+  }
+
+  .mode-pill--active {
+    @apply border-brand-dark bg-brand-dark text-white;
+  }
+
+  .stats-chip {
+    @apply rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-right;
+  }
+
+  .stats-chip__label {
+    @apply block text-xs uppercase tracking-[0.16em] text-slate-500;
+  }
+
+  .stats-chip__value {
+    @apply mt-1 block text-2xl font-semibold text-brand-dark;
+  }
+
+  .nav-link {
+    @apply rounded-full px-4 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-100 hover:text-brand-dark;
+  }
+
+  .vote-btn {
+    @apply inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:text-brand-dark disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .loading-mark {
+    @apply flex h-16 w-16 items-center justify-center rounded-full bg-brand-dark text-2xl font-semibold text-white;
+    animation: pulseMark 1.2s ease-in-out infinite;
   }
 }
 
-/* ---- Animations ---- */
-.animate-fade-in { animation: fadeIn 0.6s ease-out both; }
-.animate-slide-up { animation: slideUp 0.5s ease-out both; }
-.animate-scale-in { animation: scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both; }
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
 }
 
-/* Party cards transition */
-.party-enter-active { animation: slideUp 0.3s ease-out; }
-.party-leave-active { transition: all 0.2s ease-in; }
-.party-leave-to { opacity: 0; transform: scale(0.95) translateY(-8px); }
-.party-move { transition: transform 0.3s ease; }
-
-/* Fade transition */
-.fade-enter-active { transition: opacity 0.3s ease; }
-.fade-leave-active { transition: opacity 0.2s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-
-/* Collapse transition */
-.collapse-enter-active { animation: collapseOpen 0.3s ease-out; overflow: hidden; }
-.collapse-leave-active { animation: collapseOpen 0.2s ease-in reverse; overflow: hidden; }
-@keyframes collapseOpen {
-  from { opacity: 0; max-height: 0; }
-  to { opacity: 1; max-height: 400px; }
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
-/* Tabular nums */
-.tabular-nums { font-variant-numeric: tabular-nums; }
-
-/* Gradient text */
-.text-gradient {
-  background: linear-gradient(135deg, #ff6b35 0%, #ff8c5a 50%, #e85d2a 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+.collapse-enter-active,
+.collapse-leave-active {
+  transition: all 0.22s ease;
+  overflow: hidden;
 }
 
-/* Score bar shimmer */
-@keyframes shimmer {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
-}
-.bar-shimmer {
-  background-size: 200% 100%;
-  animation: shimmer 2s linear infinite;
+.collapse-enter-from,
+.collapse-leave-to {
+  max-height: 0;
+  opacity: 0;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 999px; }
+.collapse-enter-to,
+.collapse-leave-from {
+  max-height: 800px;
+  opacity: 1;
+}
+
+@keyframes pulseMark {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.96);
+    opacity: 0.85;
+  }
+}
