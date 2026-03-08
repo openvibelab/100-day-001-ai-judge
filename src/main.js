@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
+import { inject } from '@vercel/analytics'
 import App from './App.vue'
 import './style.css'
 
@@ -19,3 +20,5 @@ const router = createRouter({
 })
 
 createApp(App).use(router).mount('#app')
+
+inject()
