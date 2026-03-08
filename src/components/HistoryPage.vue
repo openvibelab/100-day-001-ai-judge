@@ -35,8 +35,7 @@ const visibleCases = computed(() => cases.value.filter((item) => modeFilter.valu
     <div class="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-10">
       <div class="mb-6 flex items-end justify-between gap-4">
         <div>
-          <p class="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">Personal Archive</p>
-          <h1 class="mt-2 text-3xl font-semibold tracking-tight text-brand-dark">我的历史记录</h1>
+          <h1 class="text-3xl font-semibold tracking-tight text-brand-dark">我的历史记录</h1>
         </div>
         <router-link to="/" class="btn-secondary">返回首页</router-link>
       </div>
@@ -66,15 +65,15 @@ const visibleCases = computed(() => cases.value.filter((item) => modeFilter.valu
             <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div class="min-w-0 flex-1">
                 <div class="mb-3 flex flex-wrap items-center gap-2">
-                  <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">{{ item.mode === 'multi' ? '多方争议' : '单方描述' }}</span>
+                  <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">{{ item.mode === 'multi' ? '多方' : '单方' }}</span>
                   <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">👍 {{ voteMap[item.id]?.up || 0 }} / 👎 {{ voteMap[item.id]?.down || 0 }}</span>
                 </div>
                 <p class="text-xl font-semibold text-brand-dark">{{ item.result?.summary || '评理记录' }}</p>
-                <p class="mt-2 text-sm leading-7 text-slate-700">{{ item.result?.verdict || '暂无裁定摘要' }}</p>
+                <p class="mt-2 text-sm leading-7 text-slate-700">{{ item.result?.verdict || '暂无摘要' }}</p>
                 <p class="mt-3 text-sm leading-7 text-slate-600">{{ item.result?.analysis || '' }}</p>
               </div>
               <div class="w-full shrink-0 rounded-2xl bg-slate-50 p-4 md:w-56">
-                <p class="text-xs uppercase tracking-[0.18em] text-slate-500">顶部结论</p>
+                <p class="text-xs text-slate-500">最高分</p>
                 <div v-if="topParty(item.result)" class="mt-3">
                   <p class="text-2xl font-semibold text-brand-dark">{{ topParty(item.result)[1] }}%</p>
                   <p class="mt-1 text-sm text-slate-600">{{ topParty(item.result)[0] }}</p>

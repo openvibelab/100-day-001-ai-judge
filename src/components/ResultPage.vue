@@ -50,7 +50,7 @@ const leadMargin = computed(() => {
   if (sortedScores.value.length < 2) return sortedScores.value[0]?.[1] || 0
   return sortedScores.value[0][1] - sortedScores.value[1][1]
 })
-const modeLabel = computed(() => inputData.value.mode === 'multi' ? '多方争议' : '单方描述')
+const modeLabel = computed(() => inputData.value.mode === 'multi' ? '多方' : '单方')
 const createdAtLabel = computed(() => caseData.value?.created_at ? new Date(caseData.value.created_at).toLocaleString() : '')
 const isServerSynced = computed(() => caseData.value?._serverSynced !== false)
 const caseNumber = computed(() => {
@@ -145,10 +145,10 @@ function formatInputBlock(entry) {
           <section class="panel overflow-hidden">
             <div class="sheet-band">
               <div>
-                <p class="sheet-kicker">裁决书</p>
-                <p class="mt-2 text-sm text-slate-600">案号 {{ caseNumber }}</p>
+                <p class="sheet-kicker">评理结果</p>
+                <p class="mt-2 text-sm text-slate-600">编号 {{ caseNumber }}</p>
               </div>
-              <div class="sheet-stamp">已裁定</div>
+              <div class="sheet-stamp">已出结果</div>
             </div>
 
             <div class="p-6 md:p-8">
@@ -157,11 +157,11 @@ function formatInputBlock(entry) {
 
               <div class="sheet-meta-grid mt-6">
                 <div class="sheet-meta-card">
-                  <p class="sheet-meta-label">受理类型</p>
+                  <p class="sheet-meta-label">提交方式</p>
                   <p class="sheet-meta-value">{{ modeLabel }}</p>
                 </div>
                 <div class="sheet-meta-card">
-                  <p class="sheet-meta-label">判定结论</p>
+                  <p class="sheet-meta-label">谁更有理</p>
                   <p class="sheet-meta-value">{{ winner }}</p>
                 </div>
                 <div class="sheet-meta-card">
@@ -181,19 +181,19 @@ function formatInputBlock(entry) {
           </section>
 
           <section class="panel p-6">
-            <p class="sheet-kicker">一、裁定依据</p>
+            <p class="sheet-kicker">判断依据</p>
             <div class="mt-4 grid gap-3">
               <div v-for="(item, index) in evidencePoints" :key="`${index}-${item}`" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <p class="text-xs uppercase tracking-[0.18em] text-slate-500">依据 {{ index + 1 }}</p>
+                <p class="text-xs text-slate-500">第 {{ index + 1 }} 点</p>
                 <p class="mt-2 text-sm leading-7 text-slate-700">{{ item }}</p>
               </div>
             </div>
           </section>
 
           <section class="panel p-6">
-            <p class="sheet-kicker">二、原始案情</p>
+            <p class="sheet-kicker">你提交的内容</p>
             <div class="mt-4 flex items-center justify-between gap-3">
-              <p class="text-sm text-slate-600">先确认 AI 理解的是不是你真正提交的内容。</p>
+              <p class="text-sm text-slate-600">确认一下 AI 看到的是不是你写的那些。</p>
               <button class="text-sm text-slate-500" @click="showInput = !showInput">{{ showInput ? '收起' : '展开' }}</button>
             </div>
 
@@ -205,7 +205,7 @@ function formatInputBlock(entry) {
               </template>
               <template v-else>
                 <div class="rounded-2xl bg-slate-50 p-4">
-                  <p class="text-xs uppercase tracking-[0.18em] text-slate-500">争议主题</p>
+                  <p class="text-xs text-slate-500">争议主题</p>
                   <p class="mt-2 text-sm leading-7 text-slate-700">{{ formatInputBlock(inputData.topic) }}</p>
                 </div>
                 <div v-for="entry in inputData.perspectives || []" :key="entry.name" class="rounded-2xl border border-slate-200 p-4">
@@ -217,7 +217,7 @@ function formatInputBlock(entry) {
           </section>
 
           <section class="panel p-6">
-            <p class="sheet-kicker">三、责任分布</p>
+            <p class="sheet-kicker">各方得分</p>
             <div class="mt-5 space-y-5">
               <div v-for="([name, score], index) in sortedScores" :key="name">
                 <div class="mb-2 flex items-center justify-between">
@@ -235,20 +235,20 @@ function formatInputBlock(entry) {
           </section>
 
           <section class="panel p-6">
-            <p class="sheet-kicker">四、完整分析</p>
+            <p class="sheet-kicker">详细分析</p>
             <p class="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">{{ result.analysis }}</p>
           </section>
 
           <section class="panel p-6">
-            <p class="sheet-kicker">五、执行建议</p>
+            <p class="sheet-kicker">给你们的建议</p>
             <p class="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">{{ result.advice }}</p>
           </section>
         </div>
 
         <aside class="space-y-4">
           <div class="panel p-5">
-            <p class="sheet-kicker">分享裁决</p>
-            <p class="mt-2 text-sm leading-6 text-slate-600">复制链接发给对方，或者直接用系统分享。</p>
+            <p class="sheet-kicker">发给对方看</p>
+            <p class="mt-2 text-sm leading-6 text-slate-600">复制链接发过去，让对方也看看 AI 怎么说。</p>
             <div class="mt-4 flex gap-3">
               <button class="btn-primary flex-1" @click="nativeShare">{{ copied ? '已复制' : '分享结果' }}</button>
               <router-link to="/" class="btn-secondary flex-1">再评一次</router-link>
@@ -256,8 +256,8 @@ function formatInputBlock(entry) {
           </div>
 
           <div class="panel p-5">
-            <p class="sheet-kicker">结果反馈</p>
-            <p class="mt-2 text-sm leading-6 text-slate-600">可以直接点赞或点踩。每个浏览器对每条记录只计一次。</p>
+            <p class="sheet-kicker">你觉得判得怎样？</p>
+            <p class="mt-2 text-sm leading-6 text-slate-600">点赞或点踩，每条只能投一次。</p>
             <div class="mt-4 grid grid-cols-2 gap-3">
               <button class="vote-btn" :disabled="hasVoted || voting" @click="castVote('up')">👍 有帮助 {{ votes.up }}</button>
               <button class="vote-btn" :disabled="hasVoted || voting" @click="castVote('down')">👎 不认可 {{ votes.down }}</button>
@@ -266,8 +266,8 @@ function formatInputBlock(entry) {
           </div>
 
           <div class="panel p-5">
-            <p class="sheet-kicker">继续浏览</p>
-            <p class="mt-2 text-sm leading-6 text-slate-600">更多公开案例会进入社区列表，你可以继续看别人怎么吵、AI 怎么判。</p>
+            <p class="sheet-kicker">看看别人的</p>
+            <p class="mt-2 text-sm leading-6 text-slate-600">去社区看看别人都在吵什么，AI 又是怎么判的。</p>
             <router-link to="/community" class="btn-secondary mt-4 w-full">去社区看看</router-link>
           </div>
         </aside>

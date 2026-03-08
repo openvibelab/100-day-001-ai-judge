@@ -72,9 +72,8 @@ const visibleCases = computed(() =>
     <div class="mx-auto max-w-5xl px-4 py-8 md:px-6 md:py-10">
       <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <p class="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">Community</p>
-          <h1 class="mt-2 text-3xl font-semibold tracking-tight text-brand-dark">社区记录</h1>
-          <p class="mt-3 text-slate-600">这里不是单纯存档，而是最近大家最常遇到的争议集合。</p>
+          <h1 class="text-3xl font-semibold tracking-tight text-brand-dark">大家都在吵什么</h1>
+          <p class="mt-3 text-slate-600">最近的评理记录，看看别人怎么吵、AI 怎么判。</p>
         </div>
         <router-link to="/" class="btn-secondary">返回首页</router-link>
       </div>
@@ -110,13 +109,13 @@ const visibleCases = computed(() =>
                 <router-link :to="`/result/${item.id}`" class="block">
                   <h2 class="text-2xl font-semibold text-brand-dark hover:underline">{{ item.result?.summary || '评理记录' }}</h2>
                 </router-link>
-                <p class="mt-2 text-sm leading-7 text-slate-700">{{ item.result?.verdict || '暂无裁定摘要' }}</p>
+                <p class="mt-2 text-sm leading-7 text-slate-700">{{ item.result?.verdict || '暂无摘要' }}</p>
                 <p class="mt-3 text-sm leading-7 text-slate-600">{{ item.result?.analysis || '' }}</p>
                 <p class="mt-4 text-xs text-slate-500">生成于 {{ item.created_at ? new Date(item.created_at).toLocaleString() : '' }}</p>
               </div>
 
               <div class="w-full shrink-0 rounded-2xl bg-slate-50 p-4 lg:w-72">
-                <p class="text-xs uppercase tracking-[0.18em] text-slate-500">概览</p>
+                <p class="text-xs text-slate-500">得分</p>
                 <div v-if="topParty(item.result)" class="mt-3">
                   <p class="text-2xl font-semibold text-brand-dark">{{ topParty(item.result)[1] }}%</p>
                   <p class="mt-1 text-sm text-slate-600">{{ topParty(item.result)[0] }} 当前占优</p>

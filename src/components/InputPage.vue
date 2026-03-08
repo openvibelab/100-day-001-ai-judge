@@ -50,7 +50,7 @@ const error = ref('')
 const showQuotaModal = ref(false)
 const pendingPayload = ref(null)
 
-const loadingMessages = ['正在整理案情', '正在分配模型', '正在生成裁定']
+const loadingMessages = ['正在整理内容', '正在连接 AI', '正在生成结果']
 const quickPrompts = ['什么时候开始吵的？', '谁先说了什么？', '对方怎么回应的？', '你最介意的点是什么？']
 const singleSteps = [
   { title: '先写起因', body: '因为什么吵起来，先把导火索交代清楚。' },
@@ -248,14 +248,14 @@ async function retryWithNewKey() {
       <div class="mx-auto flex min-h-full w-full max-w-3xl flex-col items-center justify-center">
         <div class="loading-mark">判</div>
         <p class="mt-6 text-center text-xl font-semibold text-brand-dark">{{ loadingText }}</p>
-        <p v-if="loadingProvider" class="mt-2 text-sm text-slate-500">当前模型：{{ loadingProvider }}</p>
+        <p v-if="loadingProvider" class="mt-2 text-sm text-slate-500">{{ loadingProvider }} 分析中</p>
 
         <div class="mt-5 h-2 w-full max-w-md overflow-hidden rounded-full bg-slate-200">
           <div class="h-full rounded-full bg-brand-orange transition-all duration-300" :style="{ width: `${loadingProgress}%` }"></div>
         </div>
 
         <div v-if="loadingTrace.length" class="mt-6 w-full rounded-[28px] border border-slate-200 bg-white/85 p-5 shadow-soft">
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">实时过程</p>
+          <p class="text-xs font-semibold text-slate-500">处理进度</p>
           <div class="mt-4 space-y-2">
             <div v-for="(item, index) in loadingTrace" :key="`${index}-${item}`" class="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
               {{ item }}
@@ -264,11 +264,11 @@ async function retryWithNewKey() {
         </div>
 
         <div v-if="loadingPreview" class="mt-4 w-full rounded-[28px] border border-slate-200 bg-white/85 p-5 shadow-soft">
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">流式输出</p>
+          <p class="text-xs font-semibold text-slate-500">AI 正在写</p>
           <pre class="mt-4 max-h-56 overflow-auto whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">{{ loadingPreview }}</pre>
         </div>
 
-        <p class="mt-4 text-sm text-slate-500">流式模式已开启，首段输出会尽快显示。</p>
+        <p class="mt-4 text-sm text-slate-500">正在分析中，稍等一下就好。</p>
       </div>
     </div>
   </Transition>
@@ -276,8 +276,8 @@ async function retryWithNewKey() {
   <Transition name="fade">
     <div v-if="showQuotaModal" class="fixed inset-0 z-[90] flex items-end justify-center bg-black/40 px-4 py-6 sm:items-center" @click.self="showQuotaModal = false">
       <div class="panel w-full max-w-md p-6">
-        <h3 class="text-xl font-semibold text-brand-dark">默认额度已用完</h3>
-        <p class="mt-2 text-sm text-slate-600">填入你自己的模型 Key 后，这一次会改用浏览器本地 Key 继续。Key 只保存在你的浏览器里。</p>
+        <h3 class="text-xl font-semibold text-brand-dark">免费额度用完了</h3>
+        <p class="mt-2 text-sm text-slate-600">填入你自己的 API Key 就能继续，Key 只保存在你的浏览器里，不会上传。</p>
         <div class="mt-5 grid grid-cols-3 gap-2">
           <button
             v-for="provider in [{ id: 'gemini', label: 'Gemini' }, { id: 'deepseek', label: 'DeepSeek' }, { id: 'openai', label: 'OpenAI' }]"
@@ -303,23 +303,20 @@ async function retryWithNewKey() {
         <div class="border-b border-slate-200 pb-5">
           <div class="flex flex-wrap items-start justify-between gap-4">
             <div class="max-w-3xl">
-              <div class="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
-                案卷录入 · Day 001
-              </div>
-              <h1 class="mt-2 text-3xl font-semibold tracking-tight text-brand-dark md:text-4xl">先把案情录进去，再生成裁决页。</h1>
-              <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">你只需要把冲突过程写清楚。系统会按案卷处理，默认先走站点服务端模型，再输出一页可分享的裁决结果。</p>
+              <h1 class="text-3xl font-semibold tracking-tight text-brand-dark md:text-4xl">把吵架经过写下来</h1>
+              <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">写清楚怎么吵的，AI 帮你分析谁更有理，生成一页可以发给对方看的结果。</p>
             </div>
             <div class="stats-chip">
-              <span class="stats-chip__label">已受理案例</span>
+              <span class="stats-chip__label">已评理</span>
               <span class="stats-chip__value">{{ caseCount.toLocaleString() }}</span>
             </div>
           </div>
 
           <div class="mt-5">
-            <p class="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">录入方式</p>
+            <p class="text-xs font-medium text-slate-500">选一种方式</p>
             <div class="mt-3 flex flex-wrap items-center gap-3">
-              <button :class="['mode-pill', mode === 'single' ? 'mode-pill--active' : '']" @click="mode = 'single'">单方案情陈述</button>
-              <button :class="['mode-pill', mode === 'multi' ? 'mode-pill--active' : '']" @click="mode = 'multi'; if (perspectives.length === 0) { addPerspective(); addPerspective() }">多方分别陈述</button>
+              <button :class="['mode-pill', mode === 'single' ? 'mode-pill--active' : '']" @click="mode = 'single'">我来写</button>
+              <button :class="['mode-pill', mode === 'multi' ? 'mode-pill--active' : '']" @click="mode = 'multi'; if (perspectives.length === 0) { addPerspective(); addPerspective() }">各方分别写</button>
               <button class="text-sm text-brand-dark underline-offset-4 hover:underline" @click="loadDemo">看一个示例</button>
             </div>
           </div>
@@ -329,10 +326,10 @@ async function retryWithNewKey() {
           <div class="overflow-hidden rounded-[28px] border border-slate-200 bg-white">
             <div class="sheet-band">
               <div>
-                <p class="sheet-kicker">案情陈述表</p>
-                <p class="mt-2 text-sm text-slate-600">单方录入 · 建议按时间顺序写</p>
+                <p class="sheet-kicker">写下经过</p>
+                <p class="mt-2 text-sm text-slate-600">建议按时间顺序写</p>
               </div>
-              <div class="sheet-stamp">录入中</div>
+              <div class="sheet-stamp">编辑中</div>
             </div>
             <div class="p-5 md:p-6">
               <div class="flex items-center justify-between gap-4">
@@ -356,7 +353,7 @@ async function retryWithNewKey() {
 
           <aside class="space-y-4">
             <div class="intake-card">
-              <p class="intake-card__title">录入顺序</p>
+              <p class="intake-card__title">怎么写比较好</p>
               <div class="mt-4 space-y-3">
                 <div v-for="(item, index) in singleSteps" :key="item.title" class="flex gap-3">
                   <div class="intake-step">{{ String(index + 1).padStart(2, '0') }}</div>
@@ -370,7 +367,7 @@ async function retryWithNewKey() {
 
             <div class="intake-card">
               <div class="flex items-center justify-between gap-4">
-                <p class="intake-card__title">即时提示</p>
+                <p class="intake-card__title">不知道怎么写？</p>
                 <button class="text-sm text-slate-500" @click="showGuide = !showGuide">{{ showGuide ? '收起' : '展开' }}</button>
               </div>
               <div v-if="showGuide" class="mt-4 flex flex-wrap gap-2">
@@ -378,7 +375,7 @@ async function retryWithNewKey() {
                   {{ item }}
                 </span>
               </div>
-              <p class="mt-4 text-sm leading-6 text-slate-600">提交后会直接进入流式生成。你能看到当前模型、处理阶段和实时输出，而不是一直干等。</p>
+              <p class="mt-4 text-sm leading-6 text-slate-600">提交后可以实时看到 AI 的分析进度，不用干等。</p>
             </div>
           </aside>
         </div>
@@ -387,10 +384,10 @@ async function retryWithNewKey() {
           <div class="overflow-hidden rounded-[28px] border border-slate-200 bg-white">
             <div class="sheet-band">
               <div>
-                <p class="sheet-kicker">多方陈述表</p>
-                <p class="mt-2 text-sm text-slate-600">分别录入每个人的版本，再交给系统综合判断</p>
+                <p class="sheet-kicker">各方说法</p>
+                <p class="mt-2 text-sm text-slate-600">每个人分别写自己的版本，AI 综合判断</p>
               </div>
-              <div class="sheet-stamp">待汇总</div>
+              <div class="sheet-stamp">编辑中</div>
             </div>
             <div class="p-5 md:p-6">
               <div>
@@ -409,7 +406,7 @@ async function retryWithNewKey() {
                     <div class="flex items-center gap-3">
                       <div class="intake-step">{{ String(index + 1).padStart(2, '0') }}</div>
                       <div>
-                        <p class="text-xs uppercase tracking-[0.18em] text-slate-500">陈述人</p>
+                        <p class="text-xs text-slate-500">昵称</p>
                         <input v-model="item.name" maxlength="20" class="mt-1 border-none bg-transparent p-0 text-base font-semibold text-brand-dark outline-none" :placeholder="`第${index + 1}方`" />
                       </div>
                     </div>
@@ -436,7 +433,7 @@ async function retryWithNewKey() {
 
           <aside class="space-y-4">
             <div class="intake-card">
-              <p class="intake-card__title">多人录入规则</p>
+              <p class="intake-card__title">多人怎么写</p>
               <div class="mt-4 space-y-3">
                 <div v-for="(item, index) in multiSteps" :key="item.title" class="flex gap-3">
                   <div class="intake-step">{{ String(index + 1).padStart(2, '0') }}</div>
@@ -449,8 +446,8 @@ async function retryWithNewKey() {
             </div>
 
             <div class="intake-card">
-              <p class="intake-card__title">系统会怎么处理</p>
-              <p class="mt-4 text-sm leading-6 text-slate-600">系统会把所有陈述汇总后统一判断，不会只偏向谁写得更长，而是优先看事实链是否完整。生成时会显示当前使用的模型和流式输出进度。</p>
+              <p class="intake-card__title">AI 怎么判</p>
+              <p class="mt-4 text-sm leading-6 text-slate-600">AI 会综合所有人的说法一起判断，不会因为谁写得多就偏向谁，重点看事实是否对得上。</p>
             </div>
           </aside>
         </div>
@@ -459,39 +456,33 @@ async function retryWithNewKey() {
 
         <div class="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-5 md:flex-row md:items-center md:justify-between">
           <div>
-            <p class="text-sm font-medium text-brand-dark">录入完成后即可生成裁决页。</p>
-            <p class="text-sm text-slate-500">默认优先走站点服务端模型。只有服务端额度受限时，才会提示你切换浏览器里保存的 Key。</p>
+            <p class="text-sm font-medium text-brand-dark">写完了就可以提交。</p>
+            <p class="text-sm text-slate-500">免费使用，如果遇到额度限制会提示你用自己的 Key。</p>
           </div>
-          <button class="btn-primary min-w-[220px]" :disabled="!canSubmit || loading" @click="submit">生成这次判断</button>
+          <button class="btn-primary min-w-[220px]" :disabled="!canSubmit || loading" @click="submit">开始评理</button>
         </div>
 
         <div class="mt-8 border-t border-slate-200 pt-5">
           <button class="text-sm font-medium text-slate-600 underline-offset-4 hover:text-brand-dark hover:underline" @click="showAdvanced = !showAdvanced">
-            {{ showAdvanced ? '收起其他入口' : '展开社区和模型设置' }}
+            {{ showAdvanced ? '收起设置' : '自定义模型 / API Key' }}
           </button>
 
           <div v-if="showAdvanced" class="mt-4 grid gap-4 md:grid-cols-2">
             <div class="intake-card">
-              <p class="intake-card__title">社区入口</p>
-              <p class="mt-3 text-sm leading-6 text-slate-600">想看别人最近的案例，或者给结果点赞点踩，可以去社区页。</p>
-              <router-link to="/community" class="btn-secondary mt-4 w-full">查看社区记录</router-link>
-            </div>
-
-            <div class="intake-card">
               <div class="flex items-start justify-between gap-4">
                 <div>
-                  <p class="intake-card__title">模型设置</p>
-                  <p class="mt-2 text-sm leading-6 text-slate-600">默认优先使用站点服务端模型。浏览器里保存的 Key 只在服务端额度受限时，或者你手动重试时才会接管。</p>
+                  <p class="intake-card__title">自定义 API Key</p>
+                  <p class="mt-2 text-sm leading-6 text-slate-600">默认免费使用。你也可以填自己的 Key，额度不够时会自动切换。</p>
                 </div>
                 <button class="text-sm text-slate-500" @click="showApiSetup = !showApiSetup">{{ showApiSetup ? '收起' : '展开' }}</button>
               </div>
 
               <div class="mt-3 rounded-xl bg-white px-3 py-2 text-sm text-slate-600">
                 <template v-if="apiConfigured">
-                  当前浏览器已保存 {{ browserProviderLabel }} Key。默认仍先走站点服务端模型。
+                  已保存 {{ browserProviderLabel }} Key
                 </template>
                 <template v-else>
-                  当前未保存自定义 Key。提交时会直接先用站点服务端模型。
+                  未设置自定义 Key，使用默认免费额度
                 </template>
               </div>
 
@@ -517,7 +508,7 @@ async function retryWithNewKey() {
                     <button class="btn-secondary flex-1" :disabled="!apiConfigured" @click="handleClearKey">清除</button>
                   </div>
 
-                  <p class="mt-3 text-xs leading-5 text-slate-500">你的 Key 只保存在本地浏览器，不会写入数据库。推荐先用站点服务端模型；只有服务端受限时再切到你自己的 Key。</p>
+                  <p class="mt-3 text-xs leading-5 text-slate-500">Key 只保存在你的浏览器里，不会上传到服务器。</p>
                 </div>
               </Transition>
             </div>
