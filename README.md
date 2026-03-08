@@ -2,9 +2,9 @@
 
 **Day 001** · [100天 Vibe Coding 挑战](https://github.com/openvibelab/openvibelab)
 
-> 谁对谁错？让 AI 说了算。
+> 吵完架，让 AI 说句公道话。
 
-输入争吵内容，AI 客观评理，生成分享链接让当事人看。
+把吵架经过写下来，AI 帮你分析谁更有理，生成一页可以发给对方看的结果。
 
 🔗 **在线体验**：[judge.openvibelab.com](https://judge.openvibelab.com)
 
@@ -12,65 +12,56 @@
 
 ## 功能
 
-- **完整描述模式**：一个人输入整件事的来龙去脉
-- **多方视角模式**：添加多个当事人，每人写自己的视角
-- **AI 客观评理**：分析各方对错，给出评分和建议
-- **分享链接**：生成唯一链接，发给当事人看结果
-- **评理记录**：查看自己的历史评理
-- **自带 API Key**：支持 Gemini / DeepSeek / OpenAI，用自己的 Key 不限次数
+- **我来写**：一个人把整件事的来龙去脉写清楚
+- **各方分别写**：最多 6 方，每人写自己的版本，AI 综合判断
+- **AI 评理**：分析各方对错，打分、给结论、给建议
+- **流式输出**：提交后实时看到 AI 的分析进度，不用干等
+- **分享结果**：生成链接发给对方看
+- **社区**：看看别人都在吵什么，给结果点赞点踩
+- **历史记录**：随时回看自己的评理
+- **自定义 API Key**：支持 Gemini / DeepSeek / OpenAI，用自己的 Key 不限次数
 
 ## 路线图
 
-- [x] 完整描述输入
-- [x] 多方视角输入（最多 6 方）
-- [x] AI 评理 + 结果页（评分、裁定、分析、建议）
+- [x] 单方 / 多方输入（最多 6 方）
+- [x] AI 评理 + 结果页（得分、结论、分析、建议）
+- [x] 流式输出（SSE）
 - [x] 分享链接
 - [x] Supabase 持久化存储
-- [x] 评理历史记录
-- [x] 用户自带 API Key（Gemini / DeepSeek / OpenAI）
+- [x] 历史记录
+- [x] 社区广场 + 投票
+- [x] 自定义 API Key（Gemini / DeepSeek / OpenAI）
 - [x] 免费额度用完后引导配置 Key
-- [ ] 公开广场（看别人的吵架） — **欢迎 PR**
-- [ ] 投票：你觉得 AI 评得对吗 — **欢迎 PR**
-- [ ] 评论：写出你的理由 — **欢迎 PR**
+- [ ] 评论功能 — **欢迎 PR**
 - [ ] 更多 AI 模型支持 — **欢迎 PR**
 
 ---
 
-## 技术选型：为什么这样搭？
+## 技术栈
 
-### 前端：Vue 3 + Vite + Tailwind CSS
-
-快。Vite 启动秒开，Vue 3 Composition API 写起来灵活，Tailwind 不用写 CSS 文件，一个人开发效率拉满。对于 Vibe Coding 这种节奏，这套组合是最快出活的。
-
-### 部署：Vercel
-
-**零配置部署**。Git push 自动构建，全球 CDN 分发，免费额度足够个人项目用。Edge Functions 让 API 代理跑在离用户最近的节点，响应快。最关键的是：不用运维服务器，一个人也能搞定部署。
-
-### AI 代理：Gemini 优先
-
-**因为免费。** Google 的 Gemini API 有慷慨的免费额度，`gemini-2.0-flash` 速度快、质量够用。作为开源项目的默认 AI 后端，零成本是第一优先级。同时支持 DeepSeek（国内推荐）和 OpenAI 作为备选，用户可以配置自己的 Key。
+| 层 | 选型 | 为什么 |
+|:--|:--|:--|
+| 前端 | Vue 3 + Vite + Tailwind CSS | 快，一个人开发效率最高 |
+| 部署 | Vercel | 零配置，push 即上线，Edge Functions 响应快 |
+| AI | Gemini（默认）/ DeepSeek / OpenAI | Gemini 免费额度大，DeepSeek 国内快，OpenAI 兜底 |
+| 数据库 | Supabase | 免费版够用，PostgreSQL 底层，后期能扩展 |
+| 备用存储 | localStorage | 断网也能用，服务端挂了不影响本地体验 |
 
 服务端 Key 优先级：Gemini → DeepSeek → OpenAI
 
-### 数据库：Supabase
-
-**免费版够用。** 500MB 数据库 + 5万月活用户 + 实时订阅，对于 MVP 阶段绰绰有余。PostgreSQL 底层，后期扩展没有天花板。REST API 开箱即用，不需要写后端。
-
-同时保留 localStorage 作为 fallback：断网也能用，服务端挂了也不影响本地体验。
-
-### 整体架构
+### 架构
 
 ```
 用户浏览器
-  ↓ 输入争吵内容
+  ↓ 写下吵架经过
 Vue 3 前端（Vercel 静态托管）
-  ↓ POST /api/judge
-Vercel Edge Function（AI 代理）
-  ↓ 转发请求
-Gemini / DeepSeek / OpenAI API
-  ↓ 返回评理结果
-  ↓ 存储到 Supabase + localStorage
-结果页 → 生成分享链接
+  ↓ POST /api/judge?stream=1
+Vercel Edge Function（AI 代理，SSE 流式输出）
+  ↓ 转发到 AI API
+Gemini / DeepSeek / OpenAI
+  ↓ 流式返回评理结果
+  ↓ 存到 Supabase + localStorage
+结果页 → 分享链接
 ```
 
 ---
@@ -92,9 +83,12 @@ npm run dev
 | `GEMINI_API_KEY` | Google Gemini API Key | 三选一 |
 | `DEEPSEEK_API_KEY` | DeepSeek API Key | 三选一 |
 | `OPENAI_API_KEY` | OpenAI API Key | 三选一 |
-| `AI_MODEL` | 自定义模型名（默认按 provider 自动选） | 否 |
+| `DEEPSEEK_MODEL` | DeepSeek 模型名（默认 `deepseek-chat`） | 否 |
+| `DEEPSEEK_BASE_URL` | DeepSeek API 地址（默认 `https://api.deepseek.com`） | 否 |
+| `OPENAI_MODEL` | OpenAI 模型名（默认 `gpt-4o-mini`） | 否 |
+| `OPENAI_BASE_URL` | OpenAI API 地址（默认 `https://api.openai.com`） | 否 |
 | `SUPABASE_URL` | Supabase 项目地址 | 否 |
-| `SUPABASE_ANON_KEY` | Supabase 匿名 Key | 否 |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase Service Role Key | 否 |
 
 ## 参与贡献
 
