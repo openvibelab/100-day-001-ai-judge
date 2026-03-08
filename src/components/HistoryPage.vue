@@ -16,48 +16,43 @@ function formatDate(dateStr) {
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-function topScore(result) {
+function topParty(result) {
   if (!result?.scores) return null
-  const sorted = Object.entries(result.scores).sort((a, b) => b[1] - a[1])
-  return sorted[0] || null
+  return Object.entries(result.scores).sort((a, b) => b[1] - a[1])[0] || null
 }
 </script>
 
 <template>
-  <div class="max-w-2xl mx-auto px-4 py-6 md:py-10">
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold">我的评理记录</h1>
-      <router-link to="/" class="text-sm text-brand-orange hover:underline">去评理 →</router-link>
+  <div class="max-w-lg mx-auto px-4 py-5 md:py-8">
+    <div class="flex items-center justify-between mb-5">
+      <h1 class="text-lg font-bold text-brand-dark">我的记录</h1>
+      <router-link to="/" class="text-sm text-brand-orange hover:underline font-medium">去评理 →</router-link>
     </div>
 
-    <div v-if="loading" class="text-center py-16 text-gray-400">加载中...</div>
+    <div v-if="loading" class="text-center py-20 text-gray-300 text-sm">加载中...</div>
 
-    <div v-else-if="cases.length === 0" class="text-center py-16">
-      <div class="text-4xl mb-3">📋</div>
-      <p class="text-gray-400 mb-4">还没有评理记录</p>
-      <router-link to="/" class="btn-primary">去评理 →</router-link>
+    <div v-else-if="cases.length === 0" class="text-center py-20">
+      <div class="text-4xl mb-3 opacity-50">📋</div>
+      <p class="text-gray-400 text-sm mb-5">还没有评理记录</p>
+      <router-link to="/" class="btn-primary text-sm">去评理 →</router-link>
     </div>
 
-    <div v-else class="space-y-3">
-      <router-link
-        v-for="c in cases"
-        :key="c.id"
-        :to="`/result/${c.id}`"
-        class="card p-4 block hover:border-brand-orange/30 transition-all group"
-      >
-        <div class="flex items-start justify-between gap-3">
+    <div v-else class="space-y-2.5">
+      <router-link v-for="c in cases" :key="c.id" :to="`/result/${c.id}`"
+        class="card-hover p-4 block group">
+        <div class="flex items-center justify-between gap-3">
           <div class="flex-1 min-w-0">
-            <p class="font-medium text-sm truncate mb-1 group-hover:text-brand-orange transition-colors">
+            <p class="font-semibold text-sm truncate group-hover:text-brand-orange transition-colors">
               {{ c.result?.summary || '评理记录' }}
             </p>
-            <p class="text-xs text-gray-400 truncate">{{ c.result?.verdict }}</p>
+            <p class="text-[11px] text-gray-300 truncate mt-0.5">{{ c.result?.verdict }}</p>
           </div>
           <div class="text-right shrink-0">
-            <template v-if="topScore(c.result)">
-              <p class="text-sm font-bold text-brand-orange">{{ topScore(c.result)[0] }}</p>
-              <p class="text-xs text-gray-400">{{ topScore(c.result)[1] }}%</p>
+            <template v-if="topParty(c.result)">
+              <p class="text-sm font-bold text-gradient">{{ topParty(c.result)[1] }}%</p>
+              <p class="text-[10px] text-gray-300">{{ topParty(c.result)[0] }}</p>
             </template>
-            <p class="text-xs text-gray-300 mt-1">{{ formatDate(c.created_at) }}</p>
+            <p class="text-[10px] text-gray-200 mt-0.5">{{ formatDate(c.created_at) }}</p>
           </div>
         </div>
       </router-link>

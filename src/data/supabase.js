@@ -1,12 +1,3 @@
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
-
-export const supabase = supabaseUrl && supabaseKey
-  ? createClient(supabaseUrl, supabaseKey)
-  : null
-
 // ---- Helpers ----
 
 function generateId() {
@@ -53,9 +44,19 @@ export async function saveCase(data) {
   const id = generateId()
   const record = { id, ...data, created_at: new Date().toISOString() }
 
-  if (supabase) {
-    const { error } = await supabase.from('cases').insert(record)
-    if (error) console.error('Supabase save error:', error)
+  try {
+    const res = await fetch('/api/cases', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(record),
+    })
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}))
+      console.error('Server save error:', errorData.error || res.status)
+    }
+  } catch (error) {
+    console.error('Server save request failed:', error)
   }
 
   const all = getLocalCases()
@@ -66,22 +67,28 @@ export async function saveCase(data) {
 }
 
 export async function getCase(id) {
-  if (supabase) {
-    const { data, error } = await supabase
-      .from('cases')
-      .select('*')
-      .eq('id', id)
-      .single()
-    if (data && !error) return data
+  try {
+    const res = await fetch(`/api/cases?id=${encodeURIComponent(id)}`)
+    if (res.ok) {
+      const payload = await res.json()
+      if (payload.data) return payload.data
+    }
+  } catch (error) {
+    console.error('Server get case request failed:', error)
   }
   const all = getLocalCases()
   return all[id] || null
 }
 
 export async function getCaseCount() {
-  if (supabase) {
-    const { count, error } = await supabase.from('cases').select('*', { count: 'exact', head: true })
-    if (!error && count !== null) return count
+  try {
+    const res = await fetch('/api/cases?count=1')
+    if (res.ok) {
+      const payload = await res.json()
+      if (typeof payload.count === 'number') return payload.count
+    }
+  } catch (error) {
+    console.error('Server count request failed:', error)
   }
   return Object.keys(getLocalCases()).length
 }
@@ -94,13 +101,15 @@ export async function getMyHistory() {
   const ids = getMyHistoryIds()
   if (ids.length === 0) return []
 
-  if (supabase) {
-    const { data } = await supabase
-      .from('cases')
-      .select('id, mode, result, created_at')
-      .in('id', ids.slice(0, 20))
-      .order('created_at', { ascending: false })
-    if (data && data.length > 0) return data
+  try {
+    const query = ids.slice(0, 20).map(encodeURIComponent).join(',')
+    const res = await fetch(`/api/cases?ids=${query}`)
+    if (res.ok) {
+      const payload = await res.json()
+      if (Array.isArray(payload.data) && payload.data.length > 0) return payload.data
+    }
+  } catch (error) {
+    console.error('Server history request failed:', error)
   }
 
   // Fallback to localStorage
@@ -109,28 +118,42 @@ export async function getMyHistory() {
 }
 
 export async function getRecentPublicCases(limit = 10) {
-  if (!supabase) return []
-  const { data } = await supabase
-    .from('cases')
-    .select('id, result, created_at')
-    .order('created_at', { ascending: false })
-    .limit(limit)
-  return data || []
+  try {
+    const res = await fetch(`/api/cases?recent=${encodeURIComponent(limit)}`)
+    if (res.ok) {
+      const payload = await res.json()
+      return payload.data || []
+    }
+  } catch (error) {
+    console.error('Server recent cases request failed:', error)
+  }
+  return []
 }
 
 export async function voteCase(id, vote /* 'up' | 'down' */) {
-  if (!supabase) return
-  const { error } = await supabase.from('votes').insert({ case_id: id, vote })
-  if (error) console.error('Vote error:', error)
+  try {
+    const res = await fetch('/api/votes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ case_id: id, vote }),
+    })
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}))
+      console.error('Vote error:', payload.error || res.status)
+    }
+  } catch (error) {
+    console.error('Vote request failed:', error)
+  }
 }
 
 export async function getVotes(id) {
-  if (!supabase) return { up: 0, down: 0 }
-  const { data } = await supabase
-    .from('votes')
-    .select('vote')
-    .eq('case_id', id)
-  const up = data?.filter(v => v.vote === 'up').length || 0
-  const down = data?.filter(v => v.vote === 'down').length || 0
-  return { up, down }
+  try {
+    const res = await fetch(`/api/votes?case_id=${encodeURIComponent(id)}`)
+    if (res.ok) {
+      return await res.json()
+    }
+  } catch (error) {
+    console.error('Get votes request failed:', error)
+  }
+  return { up: 0, down: 0 }
 }

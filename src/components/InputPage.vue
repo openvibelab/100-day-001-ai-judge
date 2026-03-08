@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { requestJudgment, hasUserApiKey, saveUserApiKey, getUserApiKey, getUserProvider } from '../data/ai.js'
+import { requestJudgment, hasUserApiKey, saveUserApiKey, clearUserApiKey, getUserApiKey, getUserProvider } from '../data/ai.js'
 import { saveCase, getCaseCount } from '../data/supabase.js'
 
 const router = useRouter()
@@ -9,60 +9,85 @@ const router = useRouter()
 const MAX_SINGLE = 3000
 const MAX_PERSPECTIVE = 1500
 
-// ---- Case count ----
+// ---- State ----
 const caseCount = ref(0)
-onMounted(async () => {
-  caseCount.value = await getCaseCount()
-})
-
-// ---- Mode toggle ----
 const mode = ref('single')
+const showTips = ref(false)
+const showApiSetup = ref(false)
 
-// ---- Single mode ----
+// Single mode
 const singleContent = ref('')
 
-// ---- Multi mode ----
+// Multi mode
 const multiTopic = ref('')
 const perspectives = ref([])
 const PARTY_LABELS = ['甲方', '乙方', '丙方', '丁方', '戊方', '己方']
 const MAX_PARTIES = 6
 
-function addPerspective() {
-  if (perspectives.value.length >= MAX_PARTIES) return
-  const idx = perspectives.value.length
-  const name = idx < PARTY_LABELS.length ? PARTY_LABELS[idx] : `第${idx + 1}方`
-  perspectives.value.push({ name, content: '' })
-  // Auto-focus new textarea
-  nextTick(() => {
-    const textareas = document.querySelectorAll('.perspective-textarea')
-    textareas[textareas.length - 1]?.focus()
-  })
-}
+// API Key
+const apiConfigured = ref(hasUserApiKey())
+const apiKeyInput = ref('')
+const apiProvider = ref('deepseek')
+const apiSaveSuccess = ref(false)
 
-function removePerspective(i) {
-  perspectives.value.splice(i, 1)
-}
-
-// ---- Demo ----
-const showTips = ref(false)
-
-function loadDemo() {
-  mode.value = 'multi'
-  multiTopic.value = '男朋友打游戏不接电话'
-  perspectives.value = [
-    { name: '女方', content: '我给他打了三个电话他都不接，后来发微信也不回。等了一个小时他才说在打游戏。我觉得游戏比我重要，很伤心。而且不是第一次了。' },
-    { name: '男方', content: '我就打了一局排位赛，大概40分钟。手机静音了没听到。看到消息马上就回了。她每次都因为这种小事发脾气我觉得很累。我也需要自己的时间。' },
-  ]
-}
-
-// ---- Submit ----
+// Submit state
 const loading = ref(false)
 const loadingProgress = ref(0)
 const loadingText = ref('')
 const error = ref('')
-const showApiKeyModal = ref(false)
+const showQuotaModal = ref(false)
 const pendingPayload = ref(null)
 
+onMounted(async () => {
+  caseCount.value = await getCaseCount()
+  // Pre-fill from saved key
+  if (hasUserApiKey()) {
+    apiKeyInput.value = getUserApiKey()
+    apiProvider.value = getUserProvider()
+  }
+})
+
+// ---- Multi mode ----
+function addPerspective() {
+  if (perspectives.value.length >= MAX_PARTIES) return
+  const idx = perspectives.value.length
+  perspectives.value.push({ name: PARTY_LABELS[idx] || `第${idx + 1}方`, content: '' })
+  nextTick(() => {
+    const els = document.querySelectorAll('.p-textarea')
+    els[els.length - 1]?.focus()
+  })
+}
+function removePerspective(i) { perspectives.value.splice(i, 1) }
+
+// ---- Demo ----
+function loadDemo() {
+  mode.value = 'multi'
+  multiTopic.value = '男朋友打游戏不接电话'
+  perspectives.value = [
+    { name: '女方', content: '我给他打了三个电话他都不接，后来发微信也不回。等了一个小时他才说在打游戏。我觉得游戏比我重要，很伤心。而且不是第一次了，说过很多次了。' },
+    { name: '男方', content: '我就打了一局排位赛，大概40分钟。手机静音了没听到。看到消息马上就回了啊。她每次都因为这种小事发脾气我真的很累。我也需要有自己的放松时间吧。' },
+  ]
+}
+
+// ---- API Key ----
+function handleSaveKey() {
+  const key = apiKeyInput.value.trim()
+  if (!key) return
+  saveUserApiKey(key, apiProvider.value)
+  apiConfigured.value = true
+  apiSaveSuccess.value = true
+  showApiSetup.value = false
+  setTimeout(() => (apiSaveSuccess.value = false), 3000)
+}
+
+function handleClearKey() {
+  clearUserApiKey()
+  apiConfigured.value = false
+  apiKeyInput.value = ''
+  apiProvider.value = 'deepseek'
+}
+
+// ---- Submit ----
 const canSubmitSingle = computed(() => singleContent.value.trim().length >= 20)
 const canSubmitMulti = computed(() =>
   multiTopic.value.trim().length > 0 &&
@@ -71,368 +96,380 @@ const canSubmitMulti = computed(() =>
 )
 const canSubmit = computed(() => mode.value === 'single' ? canSubmitSingle.value : canSubmitMulti.value)
 
-const loadingMessages = [
-  '正在阅读各方陈述...',
-  '正在分析事件经过...',
-  '正在权衡各方立场...',
-  '正在撰写裁定书...',
-  '马上出结果...',
-]
+const loadingMessages = ['正在阅读各方陈述...', '正在分析事件经过...', '正在权衡各方立场...', '正在撰写裁定书...', '马上出结果...']
 
 function buildPayload() {
-  return mode.value === 'single'
-    ? { mode: 'single', content: singleContent.value.trim().slice(0, MAX_SINGLE) }
-    : {
-        mode: 'multi',
-        topic: multiTopic.value.trim().slice(0, 200),
-        perspectives: perspectives.value.map(p => ({
-          name: p.name.slice(0, 20),
-          content: p.content.trim().slice(0, MAX_PERSPECTIVE),
-        }))
-      }
+  if (mode.value === 'single') {
+    return { mode: 'single', content: singleContent.value.trim().slice(0, MAX_SINGLE) }
+  }
+  return {
+    mode: 'multi',
+    topic: multiTopic.value.trim().slice(0, 200),
+    perspectives: perspectives.value.map(p => ({
+      name: p.name.slice(0, 20),
+      content: p.content.trim().slice(0, MAX_PERSPECTIVE),
+    }))
+  }
 }
 
 async function submit() {
   if (!canSubmit.value || loading.value) return
-  const payload = buildPayload()
-  await doSubmit(payload)
+  await doSubmit(buildPayload())
 }
 
-async function doSubmit(payload, useUserKey = false) {
+async function doSubmit(payload) {
   loading.value = true
   error.value = ''
   loadingProgress.value = 0
   loadingText.value = loadingMessages[0]
 
-  // Fake progress
   let msgIndex = 0
-  const progressTimer = setInterval(() => {
-    loadingProgress.value = Math.min(loadingProgress.value + 2 + Math.random() * 3, 92)
-    const newIdx = Math.floor(loadingProgress.value / 20)
-    if (newIdx !== msgIndex && newIdx < loadingMessages.length) {
-      msgIndex = newIdx
-      loadingText.value = loadingMessages[msgIndex]
-    }
+  const timer = setInterval(() => {
+    loadingProgress.value = Math.min(loadingProgress.value + 1.5 + Math.random() * 2.5, 92)
+    const i = Math.floor(loadingProgress.value / 20)
+    if (i !== msgIndex && i < loadingMessages.length) { msgIndex = i; loadingText.value = loadingMessages[i] }
   }, 300)
 
   try {
-    const result = await requestJudgment(payload, { useUserKey })
-
+    const result = await requestJudgment(payload)
     loadingProgress.value = 100
     loadingText.value = '评理完成！'
-
-    const id = await saveCase({
-      mode: mode.value,
-      input: payload,
-      result: typeof result === 'string' ? JSON.parse(result) : result,
-    })
-
-    // Brief pause to show 100%
-    await new Promise(r => setTimeout(r, 400))
+    const id = await saveCase({ mode: mode.value, input: payload, result: typeof result === 'string' ? JSON.parse(result) : result })
+    await new Promise(r => setTimeout(r, 500))
     router.push(`/result/${id}`)
   } catch (e) {
     if (e.code === 'QUOTA_EXCEEDED') {
       pendingPayload.value = payload
-      showApiKeyModal.value = true
+      showQuotaModal.value = true
+    } else if (e.code === 'INVALID_KEY') {
+      error.value = 'API Key 无效，请检查后重试'
+      showApiSetup.value = true
     } else {
       error.value = e.message || '请求失败，请稍后再试'
     }
   } finally {
-    clearInterval(progressTimer)
+    clearInterval(timer)
     loading.value = false
     loadingProgress.value = 0
   }
 }
 
-// ---- API Key Modal ----
-const apiKeyInput = ref(getUserApiKey())
-const apiKeyProvider = ref(getUserProvider())
-
-async function submitWithUserKey() {
-  if (!apiKeyInput.value.trim()) return
-  saveUserApiKey(apiKeyInput.value.trim(), apiKeyProvider.value)
-  showApiKeyModal.value = false
+// Retry after setting key from quota modal
+async function retryWithNewKey() {
+  const key = apiKeyInput.value.trim()
+  if (!key) return
+  saveUserApiKey(key, apiProvider.value)
+  apiConfigured.value = true
+  showQuotaModal.value = false
   if (pendingPayload.value) {
-    await doSubmit(pendingPayload.value, true)
+    await doSubmit(pendingPayload.value)
     pendingPayload.value = null
   }
 }
 </script>
 
 <template>
-  <!-- Loading overlay -->
+  <!-- ===== Loading overlay ===== -->
   <Transition name="fade">
-    <div v-if="loading" class="fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center px-6">
-      <div class="text-6xl mb-6 animate-bounce">⚖️</div>
-      <p class="text-lg font-bold text-brand-dark mb-2">{{ loadingText }}</p>
-      <div class="w-64 h-2 bg-gray-100 rounded-full overflow-hidden mb-3">
-        <div
-          class="h-full bg-brand-orange rounded-full transition-all duration-300 ease-out"
-          :style="{ width: loadingProgress + '%' }"
-        ></div>
+    <div v-if="loading" class="fixed inset-0 z-[100] flex flex-col items-center justify-center px-6"
+         style="background: linear-gradient(165deg, #fef9f4 0%, #fff 100%)">
+      <div class="relative mb-8">
+        <div class="text-7xl animate-bounce" style="animation-duration: 1.5s">⚖️</div>
+        <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-12 h-2 bg-black/5 rounded-full blur-sm"></div>
       </div>
-      <p class="text-xs text-gray-400">AI 正在认真思考中，请稍等...</p>
+      <p class="text-lg font-bold text-brand-dark mb-4">{{ loadingText }}</p>
+      <div class="w-56 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div class="h-full rounded-full bg-gradient-to-r from-brand-orange to-brand-orange-light transition-all duration-500 ease-out"
+             :style="{ width: loadingProgress + '%' }"></div>
+      </div>
+      <p class="text-[11px] text-gray-300 mt-6">通常需要 5-15 秒</p>
     </div>
   </Transition>
 
-  <!-- API Key Modal -->
+  <!-- ===== Quota exceeded modal ===== -->
   <Transition name="fade">
-    <div v-if="showApiKeyModal" class="fixed inset-0 z-[90] bg-black/50 flex items-center justify-center px-4" @click.self="showApiKeyModal = false">
-      <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-slide-up">
-        <h3 class="font-bold text-lg mb-1">🔑 免费额度用完了</h3>
-        <p class="text-sm text-gray-500 mb-5">输入你自己的 API Key 即可继续使用，完全免费。</p>
+    <div v-if="showQuotaModal" class="fixed inset-0 z-[90] bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center" @click.self="showQuotaModal = false">
+      <div class="bg-white rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md shadow-2xl animate-slide-up safe-bottom">
+        <div class="text-center mb-5">
+          <div class="text-3xl mb-2">😅</div>
+          <h3 class="font-bold text-lg">免费额度用完了</h3>
+          <p class="text-sm text-gray-400 mt-1">配置自己的 API Key 即可继续，永久免费</p>
+        </div>
 
-        <!-- Provider select -->
+        <!-- Provider pills -->
         <div class="flex gap-2 mb-4">
-          <button
-            v-for="p in [
-              { id: 'gemini', label: 'Gemini', hint: '推荐·免费' },
-              { id: 'openai', label: 'OpenAI' },
-              { id: 'deepseek', label: 'DeepSeek' },
-            ]"
-            :key="p.id"
-            @click="apiKeyProvider = p.id"
-            :class="['flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-all border-2',
-              apiKeyProvider === p.id
-                ? 'border-brand-orange bg-brand-orange/5 text-brand-orange'
-                : 'border-gray-100 text-gray-400 hover:border-gray-200']"
-          >
+          <button v-for="p in [
+            { id: 'deepseek', label: 'DeepSeek', tag: '推荐' },
+            { id: 'gemini', label: 'Gemini' },
+            { id: 'openai', label: 'OpenAI' },
+          ]" :key="p.id" @click="apiProvider = p.id"
+            :class="['flex-1 py-2 rounded-xl text-sm font-medium transition-all border-2',
+              apiProvider === p.id ? 'border-brand-orange bg-brand-orange/5 text-brand-orange' : 'border-gray-100 text-gray-400']">
             {{ p.label }}
-            <span v-if="p.hint" class="block text-xs opacity-60">{{ p.hint }}</span>
+            <span v-if="p.tag" class="text-[10px] block opacity-60">{{ p.tag }}</span>
           </button>
         </div>
 
-        <!-- API Key input -->
-        <input
-          v-model="apiKeyInput"
-          type="password"
-          :placeholder="apiKeyProvider === 'gemini' ? 'AIzaSy...' : 'sk-...'"
-          class="input-base mb-3"
-          autocomplete="off"
-        />
+        <input v-model="apiKeyInput" type="password" :placeholder="apiProvider === 'gemini' ? 'AIzaSy...' : 'sk-...'"
+          class="input-base mb-3" autocomplete="off" />
 
-        <!-- Help link -->
-        <p class="text-xs text-gray-400 mb-5">
-          <template v-if="apiKeyProvider === 'gemini'">
-            <a href="https://aistudio.google.com/apikey" target="_blank" class="text-brand-orange hover:underline">
-              免费获取 Gemini API Key →
-            </a>
-            （Google 账号即可，无需付费）
+        <p class="text-[11px] text-gray-400 mb-5">
+          <template v-if="apiProvider === 'deepseek'">
+            前往 <a href="https://platform.deepseek.com/api_keys" target="_blank" class="text-brand-orange hover:underline">DeepSeek 开放平台</a> 获取 Key · 注册即送额度
           </template>
-          <template v-else-if="apiKeyProvider === 'openai'">
-            前往 <a href="https://platform.openai.com/api-keys" target="_blank" class="text-brand-orange hover:underline">OpenAI 控制台</a> 创建 Key
+          <template v-else-if="apiProvider === 'gemini'">
+            前往 <a href="https://aistudio.google.com/apikey" target="_blank" class="text-brand-orange hover:underline">Google AI Studio</a> 免费获取
           </template>
           <template v-else>
-            前往 <a href="https://platform.deepseek.com/api_keys" target="_blank" class="text-brand-orange hover:underline">DeepSeek 控制台</a> 创建 Key
+            前往 <a href="https://platform.openai.com/api-keys" target="_blank" class="text-brand-orange hover:underline">OpenAI</a> 获取
           </template>
         </p>
 
         <div class="flex gap-3">
-          <button @click="showApiKeyModal = false" class="btn-secondary flex-1">取消</button>
-          <button
-            @click="submitWithUserKey"
-            :disabled="!apiKeyInput.trim()"
-            class="btn-primary flex-1"
-          >
-            继续评理
-          </button>
+          <button @click="showQuotaModal = false" class="btn-secondary flex-1 text-sm !py-2.5">算了</button>
+          <button @click="retryWithNewKey" :disabled="!apiKeyInput.trim()" class="btn-primary flex-1 text-sm !py-2.5">继续评理 →</button>
         </div>
-
-        <p class="text-xs text-gray-300 text-center mt-4">🔒 你的 Key 仅存储在本地浏览器中，不会被我们保存</p>
+        <p class="text-[10px] text-gray-300 text-center mt-3">🔒 Key 仅存于你的浏览器本地</p>
       </div>
     </div>
   </Transition>
 
-  <div class="max-w-2xl mx-auto px-4 py-6 md:py-10">
+  <!-- ===== Main content ===== -->
+  <div class="max-w-lg mx-auto px-4 py-5 md:py-8 pb-28">
+
     <!-- Hero -->
-    <div class="text-center mb-6">
-      <h1 class="text-3xl md:text-4xl font-bold mb-2">谁对谁错？</h1>
-      <p class="text-gray-500 text-lg mb-3">让 AI 说了算。</p>
-      <p v-if="caseCount > 0" class="inline-block text-xs text-gray-400 bg-gray-100 rounded-full px-3 py-1">
-        已有 <span class="font-bold text-brand-orange">{{ caseCount }}</span> 人用过
+    <div class="text-center mb-5">
+      <h1 class="text-[28px] md:text-4xl font-black text-brand-dark leading-tight mb-1.5">
+        谁对谁错？
+      </h1>
+      <p class="text-gray-400">让 AI 帮你评理</p>
+      <p v-if="caseCount > 0" class="text-[11px] text-gray-300 mt-2">
+        已有 <span class="text-brand-orange font-bold">{{ caseCount.toLocaleString() }}</span> 次评理
       </p>
     </div>
 
-    <!-- Example card -->
-    <div class="card p-4 mb-6 cursor-pointer group hover:border-brand-orange/30 transition-all" @click="loadDemo">
+    <!-- API Key banner -->
+    <div class="mb-5">
+      <!-- Not configured -->
+      <div v-if="!apiConfigured" class="card p-3.5 cursor-pointer group" @click="showApiSetup = !showApiSetup">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <span class="w-7 h-7 rounded-full bg-brand-orange/10 flex items-center justify-center text-sm">🔑</span>
+            <div>
+              <p class="text-sm font-medium text-gray-700">配置 API Key <span class="text-brand-orange text-xs font-normal">推荐</span></p>
+              <p class="text-[11px] text-gray-400">免费额度有限 · 用自己的 Key 更稳定</p>
+            </div>
+          </div>
+          <span class="text-gray-300 text-xs transition-transform duration-200" :class="showApiSetup ? 'rotate-180' : ''">▼</span>
+        </div>
+      </div>
+
+      <!-- Configured -->
+      <div v-else class="flex items-center justify-between px-1">
+        <div class="flex items-center gap-2 text-xs text-gray-400">
+          <span class="w-5 h-5 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center text-[10px]">✓</span>
+          <span>已配置 {{ getUserProvider() === 'deepseek' ? 'DeepSeek' : getUserProvider() === 'gemini' ? 'Gemini' : 'OpenAI' }}</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <button @click="showApiSetup = !showApiSetup" class="text-[11px] text-gray-300 hover:text-gray-500 transition-colors">修改</button>
+          <button @click="handleClearKey" class="text-[11px] text-gray-300 hover:text-red-400 transition-colors">清除</button>
+        </div>
+      </div>
+
+      <!-- Success toast -->
+      <Transition name="fade">
+        <p v-if="apiSaveSuccess" class="text-xs text-green-500 text-center mt-2 animate-fade-in">✓ API Key 已保存</p>
+      </Transition>
+
+      <!-- API setup panel -->
+      <Transition name="collapse">
+        <div v-if="showApiSetup && !apiConfigured" class="mt-3 card p-4">
+          <!-- Provider -->
+          <div class="flex gap-2 mb-3">
+            <button v-for="p in [
+              { id: 'deepseek', label: 'DeepSeek', sub: '国内推荐' },
+              { id: 'gemini', label: 'Gemini', sub: '免费额度多' },
+              { id: 'openai', label: 'OpenAI', sub: '' },
+            ]" :key="p.id" @click="apiProvider = p.id"
+              :class="['flex-1 py-2 px-2 rounded-xl text-xs font-medium transition-all border-2 text-center',
+                apiProvider === p.id ? 'border-brand-orange bg-brand-orange/5 text-brand-orange' : 'border-gray-100 text-gray-400 hover:border-gray-200']">
+              {{ p.label }}
+              <span v-if="p.sub" class="block text-[10px] opacity-50 mt-0.5">{{ p.sub }}</span>
+            </button>
+          </div>
+          <!-- Key input -->
+          <div class="flex gap-2">
+            <input v-model="apiKeyInput" type="password" :placeholder="apiProvider === 'gemini' ? 'AIzaSy...' : 'sk-...'"
+              class="input-base flex-1 !py-2 text-sm" autocomplete="off" @keyup.enter="handleSaveKey" />
+            <button @click="handleSaveKey" :disabled="!apiKeyInput.trim()"
+              class="btn-primary !py-2 !px-4 text-sm shrink-0">保存</button>
+          </div>
+          <!-- Help -->
+          <p class="text-[11px] text-gray-300 mt-2.5">
+            <template v-if="apiProvider === 'deepseek'">
+              <a href="https://platform.deepseek.com/api_keys" target="_blank" class="text-brand-orange hover:underline">获取 DeepSeek Key →</a> 注册即送额度
+            </template>
+            <template v-else-if="apiProvider === 'gemini'">
+              <a href="https://aistudio.google.com/apikey" target="_blank" class="text-brand-orange hover:underline">获取 Gemini Key →</a> Google 账号即可
+            </template>
+            <template v-else>
+              <a href="https://platform.openai.com/api-keys" target="_blank" class="text-brand-orange hover:underline">获取 OpenAI Key →</a>
+            </template>
+            <span class="ml-1">· Key 仅存在你的浏览器中</span>
+          </p>
+        </div>
+      </Transition>
+    </div>
+
+    <!-- Demo card -->
+    <div class="card-hover p-4 mb-5 cursor-pointer group" @click="loadDemo">
       <div class="flex items-start gap-3">
-        <div class="text-2xl shrink-0">💬</div>
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand-orange/10 to-brand-orange/5 flex items-center justify-center text-lg shrink-0">💬</div>
         <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 mb-1">
-            <span class="text-xs font-medium text-gray-400">示例案例</span>
-            <span class="text-xs text-brand-orange opacity-0 group-hover:opacity-100 transition-opacity">点击试一试 →</span>
+          <div class="flex items-center gap-2 mb-0.5">
+            <span class="text-[11px] text-gray-300 font-medium">示例</span>
+            <span class="text-[11px] text-brand-orange opacity-0 group-hover:opacity-100 transition-opacity">点击试试 →</span>
           </div>
-          <p class="text-sm font-medium text-gray-700 mb-1">男朋友打游戏不接电话</p>
-          <div class="flex items-center gap-3 text-xs text-gray-400">
-            <span>女方 65% · 男方 35%</span>
-            <span class="text-brand-orange">→ 女方更有理</span>
-          </div>
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">男朋友打游戏不接电话</p>
+          <p class="text-xs text-gray-400">
+            <span class="text-brand-orange font-medium">女方 65%</span>
+            <span class="mx-1 text-gray-200">·</span>
+            <span>男方 35%</span>
+          </p>
         </div>
       </div>
     </div>
 
     <!-- Mode toggle -->
-    <div class="flex justify-center mb-6">
-      <div class="inline-flex bg-gray-100 rounded-xl p-1 w-full max-w-xs">
-        <button
-          @click="mode = 'single'"
-          :class="['flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all',
-            mode === 'single' ? 'bg-white text-brand-dark shadow-sm' : 'text-gray-500 hover:text-gray-700']"
-        >
+    <div class="flex mb-5">
+      <div class="inline-flex bg-white/80 rounded-2xl p-1 shadow-soft w-full">
+        <button @click="mode = 'single'"
+          :class="['flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300',
+            mode === 'single' ? 'bg-brand-dark text-white shadow-sm' : 'text-gray-400 hover:text-gray-600']">
           📝 一人讲述
         </button>
-        <button
-          @click="mode = 'multi'"
-          :class="['flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all',
-            mode === 'multi' ? 'bg-white text-brand-dark shadow-sm' : 'text-gray-500 hover:text-gray-700']"
-        >
+        <button @click="mode = 'multi'"
+          :class="['flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300',
+            mode === 'multi' ? 'bg-brand-dark text-white shadow-sm' : 'text-gray-400 hover:text-gray-600']">
           👥 多人各讲
         </button>
       </div>
     </div>
 
-    <!-- Single mode -->
-    <div v-if="mode === 'single'" class="card p-5 md:p-6">
+    <!-- ===== Single mode ===== -->
+    <div v-if="mode === 'single'" class="card p-5">
       <div class="flex items-center justify-between mb-3">
-        <h2 class="font-bold">描述事件</h2>
-        <button @click="showTips = !showTips" class="text-xs text-gray-400 hover:text-brand-orange transition-colors">
-          {{ showTips ? '收起提示' : '写作提示 💡' }}
+        <h2 class="font-bold text-gray-700">描述事件</h2>
+        <button @click="showTips = !showTips" class="text-[11px] text-gray-300 hover:text-brand-orange transition-colors">
+          {{ showTips ? '收起' : '写作提示 💡' }}
         </button>
       </div>
 
-      <!-- Collapsible tips -->
       <Transition name="collapse">
-        <div v-if="showTips" class="mb-4 p-3 rounded-xl bg-brand-orange/5 text-xs text-gray-500 space-y-1">
-          <p>· 🕐 时间地点：什么时候、在哪发生的</p>
-          <p>· 👥 人物：用 A/B 或具体称呼区分每个人</p>
-          <p>· 💥 起因经过：因为什么吵的，各方做了什么</p>
-          <p>· 🎯 结果：现在是什么情况</p>
+        <div v-if="showTips" class="mb-3 p-3 rounded-2xl bg-brand-cream text-[12px] text-gray-400 space-y-1 leading-relaxed">
+          <p>· 👥 人物要区分清楚（甲/乙/男方/女方）</p>
+          <p>· 💥 写清楚起因、经过、各方做了什么</p>
+          <p>· 🎯 描述越详细，AI 判断越准</p>
         </div>
       </Transition>
 
-      <textarea
-        v-model="singleContent"
-        placeholder="描述一下你们在吵什么，越详细越好..."
-        :maxlength="MAX_SINGLE"
-        rows="8"
-        autocomplete="off"
-        class="input-base resize-none leading-relaxed"
-      ></textarea>
-
-      <div class="flex items-center justify-between mt-2">
-        <span class="text-xs text-gray-300">
-          {{ singleContent.length }} / {{ MAX_SINGLE }}
-          <span v-if="singleContent.length > 0 && singleContent.length < 20" class="text-brand-orange">（至少 20 字）</span>
-        </span>
-      </div>
+      <textarea v-model="singleContent" placeholder="描述一下你们在吵什么，越详细越好..."
+        :maxlength="MAX_SINGLE" rows="7" autocomplete="off"
+        class="input-base resize-none leading-relaxed"></textarea>
+      <p class="text-[11px] text-gray-300 text-right mt-1.5">
+        {{ singleContent.length }}<span class="text-gray-200">/{{ MAX_SINGLE }}</span>
+        <span v-if="singleContent.length > 0 && singleContent.length < 20" class="text-brand-orange ml-1">至少 20 字</span>
+      </p>
     </div>
 
-    <!-- Multi mode -->
+    <!-- ===== Multi mode ===== -->
     <div v-else class="space-y-3">
       <!-- Topic -->
       <div class="card p-5">
-        <h2 class="font-bold mb-2">在吵什么？</h2>
-        <input
-          v-model="multiTopic"
-          type="text"
-          maxlength="200"
-          autocomplete="off"
+        <h2 class="font-bold text-gray-700 mb-2">在吵什么？</h2>
+        <input v-model="multiTopic" type="text" maxlength="200" autocomplete="off"
           placeholder="一句话说明，例：关于周末要不要去见对方父母"
-          class="input-base"
-        />
+          class="input-base" />
       </div>
 
-      <!-- Party count hint -->
+      <!-- Hint -->
       <div class="flex items-center justify-between px-1">
-        <p class="text-sm text-gray-400">
-          <span v-if="perspectives.length === 0">👇 添加吵架的各方</span>
-          <span v-else>已添加 {{ perspectives.length }} 方
-            <span v-if="perspectives.length < 2" class="text-brand-orange">（至少 2 方才能评理）</span>
+        <p class="text-xs text-gray-400">
+          <template v-if="perspectives.length === 0">👇 添加吵架的各方</template>
+          <template v-else>
+            已添加 <span class="font-bold">{{ perspectives.length }}</span> 方
+            <span v-if="perspectives.length < 2" class="text-brand-orange">· 至少 2 方</span>
             <span v-else class="text-green-500">✓</span>
-          </span>
+          </template>
         </p>
-        <span v-if="perspectives.length > 0" class="text-xs text-gray-300">最多 {{ MAX_PARTIES }} 方</span>
       </div>
 
-      <!-- Perspectives -->
+      <!-- Perspective cards -->
       <TransitionGroup name="party">
-        <div v-for="(p, i) in perspectives" :key="'p-' + i" class="card p-5 relative">
+        <div v-for="(p, i) in perspectives" :key="'p-' + i" class="card p-4 relative">
           <div class="flex items-center justify-between mb-2">
             <div class="flex items-center gap-2">
-              <span class="w-6 h-6 rounded-full bg-brand-orange/10 text-brand-orange text-xs flex items-center justify-center font-bold">
+              <span :class="['w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-bold text-white',
+                i === 0 ? 'bg-brand-orange' : i === 1 ? 'bg-brand-blue' : 'bg-brand-teal']">
                 {{ i + 1 }}
               </span>
-              <input
-                v-model="p.name"
-                maxlength="20"
-                class="font-bold bg-transparent border-none outline-none w-20 focus:ring-0 p-0"
-                :placeholder="'第' + (i + 1) + '方'"
-              />
+              <input v-model="p.name" maxlength="20"
+                class="font-bold text-sm bg-transparent outline-none w-20 p-0"
+                :placeholder="'第' + (i + 1) + '方'" />
             </div>
-            <button
-              @click="removePerspective(i)"
-              class="w-6 h-6 rounded-full text-gray-300 hover:bg-red-50 hover:text-red-400 transition-all text-xs flex items-center justify-center"
-              title="移除"
-            >✕</button>
+            <button @click="removePerspective(i)"
+              class="w-6 h-6 rounded-lg text-gray-200 hover:bg-red-50 hover:text-red-400 transition-all text-xs flex items-center justify-center">✕</button>
           </div>
-          <textarea
-            v-model="p.content"
-            :maxlength="MAX_PERSPECTIVE"
-            :placeholder="'从' + p.name + '的角度：发生了什么？你的感受和立场是什么？'"
-            rows="4"
-            autocomplete="off"
-            class="input-base resize-none leading-relaxed perspective-textarea"
-          ></textarea>
-          <div class="flex items-center justify-between mt-1.5">
-            <span class="text-xs text-gray-300">
-              {{ p.content.length }} / {{ MAX_PERSPECTIVE }}
-              <span v-if="p.content.length > 0 && p.content.length < 10" class="text-brand-orange">（至少 10 字）</span>
-            </span>
-          </div>
+          <textarea v-model="p.content" :maxlength="MAX_PERSPECTIVE"
+            :placeholder="'从' + p.name + '的角度：发生了什么？你的感受和立场是？'"
+            rows="3" autocomplete="off"
+            class="input-base resize-none leading-relaxed text-sm p-textarea"></textarea>
+          <p class="text-[11px] text-gray-300 text-right mt-1">
+            {{ p.content.length }}<span class="text-gray-200">/{{ MAX_PERSPECTIVE }}</span>
+            <span v-if="p.content.length > 0 && p.content.length < 10" class="text-brand-orange ml-1">至少 10 字</span>
+          </p>
         </div>
       </TransitionGroup>
 
-      <!-- Add party button -->
-      <button
-        v-if="perspectives.length < MAX_PARTIES"
-        @click="addPerspective"
+      <!-- Add button -->
+      <button v-if="perspectives.length < MAX_PARTIES" @click="addPerspective"
         :class="[
-          'w-full py-3.5 rounded-xl font-medium transition-all text-sm',
+          'w-full py-3 rounded-2xl font-semibold transition-all text-sm',
           perspectives.length === 0
-            ? 'bg-brand-orange text-white hover:bg-brand-orange-light shadow-md hover:shadow-lg hover:shadow-brand-orange/20'
-            : 'border-2 border-dashed border-gray-200 text-gray-400 hover:border-brand-orange hover:text-brand-orange'
-        ]"
-      >
+            ? 'bg-gradient-to-r from-brand-orange to-brand-orange-light text-white shadow-glow-orange hover:shadow-glow-orange-lg'
+            : 'bg-white border-2 border-dashed border-gray-200 text-gray-400 hover:border-brand-orange hover:text-brand-orange'
+        ]">
         + 添加{{ perspectives.length === 0 ? '第一方' : '一方' }}当事人
       </button>
     </div>
 
     <!-- Error -->
-    <div v-if="error" class="mt-4 p-3.5 rounded-xl bg-red-50 text-red-600 text-sm flex items-start gap-2.5">
-      <span class="shrink-0">⚠️</span>
-      <div class="flex-1">
-        <p>{{ error }}</p>
-        <button @click="error = ''" class="text-red-400 hover:text-red-600 text-xs mt-1 underline">关闭</button>
+    <Transition name="fade">
+      <div v-if="error" class="mt-4 p-3 rounded-2xl bg-red-50/80 text-red-500 text-sm flex items-start gap-2">
+        <span class="shrink-0 text-xs mt-0.5">⚠️</span>
+        <div class="flex-1">
+          <p class="text-sm">{{ error }}</p>
+          <button @click="error = ''" class="text-red-300 text-[11px] mt-0.5 hover:underline">关闭</button>
+        </div>
       </div>
-    </div>
+    </Transition>
 
-    <!-- Submit (sticky on mobile) -->
-    <div class="sticky bottom-4 z-40 mt-5">
-      <button
-        @click="submit"
-        :disabled="!canSubmit || loading"
+    <p class="text-center text-[11px] text-gray-300 mt-5 mb-2">描述越详细 · 评理越准确</p>
+  </div>
+
+  <!-- ===== Sticky submit ===== -->
+  <div class="fixed bottom-0 left-0 right-0 z-40 p-4 pb-5"
+       style="background: linear-gradient(to top, rgba(254,249,244,1) 60%, rgba(254,249,244,0))">
+    <div class="max-w-lg mx-auto">
+      <button @click="submit" :disabled="!canSubmit || loading"
         :class="[
-          'w-full py-4 text-lg rounded-2xl font-bold transition-all duration-300',
+          'w-full py-4 rounded-2xl text-[16px] font-bold transition-all duration-300',
           canSubmit
-            ? 'bg-brand-orange text-white shadow-lg shadow-brand-orange/30 hover:shadow-xl hover:shadow-brand-orange/40 hover:bg-brand-orange-light active:scale-[0.98]'
-            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-        ]"
-      >
+            ? 'bg-gradient-to-r from-brand-orange to-brand-orange-light text-white shadow-glow-orange hover:shadow-glow-orange-lg active:scale-[0.98]'
+            : 'bg-gray-200/80 text-gray-400 cursor-not-allowed'
+        ]">
         ⚖️ 让 AI 评理
       </button>
     </div>
-
-    <!-- Minimal tip -->
-    <p class="text-center text-xs text-gray-300 mt-4 mb-2">描述越详细，评理越准确</p>
   </div>
 </template>
