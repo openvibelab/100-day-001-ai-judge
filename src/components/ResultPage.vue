@@ -30,7 +30,24 @@ onMounted(async () => {
 
 const result = computed(() => caseData.value?.result || {})
 const inputData = computed(() => caseData.value?.input || {})
-const sortedScores = computed(() => Object.entries(result.value.scores || {}).sort((a, b) => b[1] - a[1]))
+const normalizedScores = computed(() => {
+  const entries = Object.entries(result.value.scores || {})
+  if (entries.length === 0) return []
+
+  const genericKeys = ['A', 'B', 'C', 'D', 'E', 'F']
+  const isGeneric = entries.every(([name]) => genericKeys.includes(name))
+
+  if (isGeneric && inputData.value.mode === 'multi' && Array.isArray(inputData.value.perspectives)) {
+    return entries.map(([_, score], index) => [inputData.value.perspectives[index]?.name || `第${index + 1}方`, score])
+  }
+
+  if (isGeneric && inputData.value.mode === 'single') {
+    return entries.map(([_, score], index) => [index === 0 ? '你' : '对方', score])
+  }
+
+  return entries
+})
+const sortedScores = computed(() => normalizedScores.value.slice().sort((a, b) => b[1] - a[1]))
 const evidencePoints = computed(() => {
   const text = result.value.analysis || ''
   return text

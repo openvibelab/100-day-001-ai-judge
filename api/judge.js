@@ -61,6 +61,25 @@ function parseOpenAIText(data) {
   return data?.choices?.[0]?.message?.content || ''
 }
 
+function extractJsonString(content) {
+  if (typeof content !== 'string') return ''
+  const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/)
+  return jsonMatch ? jsonMatch[1].trim() : content.trim()
+}
+
+function tryParseStructuredResult(content) {
+  const raw = extractJsonString(content)
+  if (!raw) return null
+
+  try {
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
 function mergeTextSnapshot(snapshot, incoming) {
   if (!incoming) return { snapshot, delta: '' }
   if (!snapshot) return { snapshot: incoming, delta: incoming }
@@ -74,6 +93,7 @@ function mergeTextSnapshot(snapshot, incoming) {
 }
 
 function extractSSEBlocks(buffer) {
+  buffer = buffer.replace(/\r\n?/g, '\n')
   const blocks = []
   let next = buffer.indexOf('\n\n')
 
@@ -116,7 +136,7 @@ async function callGemini(apiKey, system, user, model) {
   return parseGeminiText(data)
 }
 
-async function callOpenAI(apiKey, baseUrl, model, system, user, jsonMode = false) {
+async function callOpenAI(apiKey, baseUrl, model, system, user, jsonMode = false, provider = 'openai') {
   const body = {
     model,
     messages: [
@@ -138,7 +158,7 @@ async function callOpenAI(apiKey, baseUrl, model, system, user, jsonMode = false
     body: JSON.stringify(body),
   })
 
-  await throwForBadAIResponse(res, baseUrl.includes('deepseek') ? 'deepseek' : 'openai')
+  await throwForBadAIResponse(res, provider)
   const data = await res.json()
   return parseOpenAIText(data)
 }
@@ -191,6 +211,11 @@ async function streamGemini(apiKey, system, user, model, hooks) {
     if (done) break
   }
 
+  if (!tryParseStructuredResult(snapshot)) {
+    hooks.onStatus?.('流式结果不完整，正在补一次完整裁定')
+    return callGemini(apiKey, system, user, model)
+  }
+
   return snapshot
 }
 
@@ -223,7 +248,7 @@ async function streamOpenAICompatible(provider, apiKey, baseUrl, model, system, 
   hooks.onStatus?.(`${providerLabel(provider)} 已开始输出`)
 
   const reader = res.body?.getReader()
-  if (!reader) return callOpenAI(apiKey, baseUrl, model, system, user, jsonMode)
+  if (!reader) return callOpenAI(apiKey, baseUrl, model, system, user, jsonMode, provider)
 
   const decoder = new TextDecoder()
   let buffer = ''
@@ -251,13 +276,17 @@ async function streamOpenAICompatible(provider, apiKey, baseUrl, model, system, 
     if (done) break
   }
 
+  if (!tryParseStructuredResult(text)) {
+    hooks.onStatus?.('流式结果不完整，正在补一次完整裁定')
+    return callOpenAI(apiKey, baseUrl, model, system, user, jsonMode, provider)
+  }
+
   return text
 }
 
 function parseResult(content) {
-  try {
-    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/)
-    const parsed = JSON.parse(jsonMatch ? jsonMatch[1].trim() : content.trim())
+  const parsed = tryParseStructuredResult(content)
+  if (parsed) {
     return {
       summary: parsed.summary || '评理完成',
       winner: parsed.winner || '',
@@ -266,15 +295,15 @@ function parseResult(content) {
       scores: parsed.scores && typeof parsed.scores === 'object' ? parsed.scores : { A: 50, B: 50 },
       advice: parsed.advice || '建议双方先冷静，再继续沟通。',
     }
-  } catch {
-    return {
-      summary: '评理完成',
-      winner: '',
-      analysis: content,
-      verdict: '请查看详细分析',
-      scores: { A: 50, B: 50 },
-      advice: '建议双方先冷静，再继续沟通。',
-    }
+  }
+
+  return {
+    summary: '评理完成',
+    winner: '',
+    analysis: content,
+    verdict: '请查看详细分析',
+    scores: { A: 50, B: 50 },
+    advice: '建议双方先冷静，再继续沟通。',
   }
 }
 
@@ -318,7 +347,7 @@ async function requestWithProvider(attempt, system, user) {
   }
 
   const config = PROVIDERS[attempt.provider]
-  return callOpenAI(attempt.apiKey, config.baseUrl(), config.model(), system, user, config.jsonMode)
+  return callOpenAI(attempt.apiKey, config.baseUrl(), config.model(), system, user, config.jsonMode, attempt.provider)
 }
 
 async function streamWithProvider(attempt, system, user, hooks) {
@@ -390,10 +419,11 @@ function streamResponse(run) {
       try {
         await run(send)
       } catch (error) {
+        const failure = buildErrorPayload(error, error.provider)
         send({
           type: 'error',
-          ...buildErrorPayload(error, error.provider).body,
-          status: buildErrorPayload(error, error.provider).status,
+          ...failure.body,
+          status: failure.status,
         })
       } finally {
         controller.close()
@@ -441,8 +471,8 @@ export default async function handler(req) {
         }
       }
 
-      const payload = buildErrorPayload(lastError || {}, lastError?.provider)
-      return jsonResponse(payload.body, payload.status)
+      const failure = buildErrorPayload(lastError || {}, lastError?.provider)
+      return jsonResponse(failure.body, failure.status)
     }
 
     return streamResponse(async (send) => {
