@@ -1,7 +1,7 @@
 export const config = { runtime: 'edge' }
 
 const MAX_INPUT_LENGTH = 12000
-const MAX_OUTPUT_TOKENS = 1800
+const MAX_OUTPUT_TOKENS = 2400
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -77,6 +77,75 @@ function tryParseStructuredResult(content) {
     return parsed
   } catch {
     return null
+  }
+}
+
+function extractQuotedField(raw, field) {
+  const match = raw.match(new RegExp(`"${field}"\\s*:\\s*"((?:\\\\.|[^"])*)"`, 's'))
+  if (!match?.[1]) return ''
+
+  try {
+    return JSON.parse(`"${match[1]}"`)
+  } catch {
+    return match[1]
+      .replace(/\\"/g, '"')
+      .replace(/\\n/g, '\n')
+      .replace(/\\t/g, '\t')
+      .trim()
+  }
+}
+
+function extractScores(raw) {
+  const block = raw.match(/"scores"\s*:\s*\{([\s\S]*?)\}/)
+  if (!block?.[1]) return {}
+
+  const scores = {}
+  const entryPattern = /"([^"]+)"\s*:\s*(\d+(?:\.\d+)?)/g
+  let match = entryPattern.exec(block[1])
+
+  while (match) {
+    scores[match[1]] = Number(match[2])
+    match = entryPattern.exec(block[1])
+  }
+
+  return scores
+}
+
+function sanitizeSalvagedText(text) {
+  return String(text || '')
+    .replace(/^[{\s"]+/, '')
+    .replace(/[}\s"]+$/, '')
+    .trim()
+}
+
+function salvageStructuredResult(content) {
+  const raw = extractJsonString(content)
+  if (!raw) return null
+
+  const summary = sanitizeSalvagedText(extractQuotedField(raw, 'summary'))
+  const winner = sanitizeSalvagedText(extractQuotedField(raw, 'winner'))
+  const verdict = sanitizeSalvagedText(extractQuotedField(raw, 'verdict'))
+  const analysis = sanitizeSalvagedText(extractQuotedField(raw, 'analysis'))
+  const advice = sanitizeSalvagedText(extractQuotedField(raw, 'advice'))
+  const scores = extractScores(raw)
+
+  if (!summary && !winner && !verdict && !analysis && !advice && Object.keys(scores).length === 0) {
+    return null
+  }
+
+  const fallbackAnalysis = [summary, verdict, analysis]
+    .filter(Boolean)
+    .join('\n\n')
+    .trim()
+
+  return {
+    summary: summary || '本次结果未完整生成',
+    winner,
+    verdict: verdict || '这次输出不完整，请结合下方内容查看。',
+    analysis: fallbackAnalysis || '这次返回的是不完整结果，系统只救回了部分字段。',
+    scores,
+    advice: advice || '建议补充更多事实后再试一次，或稍后重新生成。',
+    partial: true,
   }
 }
 
@@ -292,18 +361,23 @@ function parseResult(content) {
       winner: parsed.winner || '',
       analysis: parsed.analysis || content,
       verdict: parsed.verdict || '请查看详细分析',
-      scores: parsed.scores && typeof parsed.scores === 'object' ? parsed.scores : { A: 50, B: 50 },
+      scores: parsed.scores && typeof parsed.scores === 'object' ? parsed.scores : {},
       advice: parsed.advice || '建议双方先冷静，再继续沟通。',
+      partial: false,
     }
   }
+
+  const salvaged = salvageStructuredResult(content)
+  if (salvaged) return salvaged
 
   return {
     summary: '评理完成',
     winner: '',
     analysis: content,
     verdict: '请查看详细分析',
-    scores: { A: 50, B: 50 },
+    scores: {},
     advice: '建议双方先冷静，再继续沟通。',
+    partial: true,
   }
 }
 

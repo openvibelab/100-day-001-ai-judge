@@ -6,10 +6,11 @@ import {
   getUserApiKey,
   getUserProvider,
   hasUserApiKey,
+  JUDGE_STYLES,
   requestJudgmentStream,
   saveUserApiKey,
 } from '../data/ai.js'
-import { getCaseCount, saveCase } from '../data/supabase.js'
+import { getMyHistoryIds, saveCase } from '../data/supabase.js'
 
 const router = useRouter()
 
@@ -28,6 +29,7 @@ const PROVIDER_LABELS = {
 
 const caseCount = ref(0)
 const mode = ref('single')
+const judgeStyle = ref('sharp')
 const singleContent = ref('')
 const multiTopic = ref('')
 const perspectives = ref([])
@@ -66,7 +68,7 @@ const multiSteps = [
 ]
 
 onMounted(async () => {
-  caseCount.value = await getCaseCount()
+  caseCount.value = getMyHistoryIds().length
   if (hasUserApiKey()) {
     apiKeyInput.value = getUserApiKey()
     apiProvider.value = getUserProvider()
@@ -113,11 +115,12 @@ function loadDemo() {
 
 function buildPayload() {
   if (mode.value === 'single') {
-    return { mode: 'single', content: singleContent.value.trim().slice(0, MAX_SINGLE) }
+    return { mode: 'single', style: judgeStyle.value, content: singleContent.value.trim().slice(0, MAX_SINGLE) }
   }
 
   return {
     mode: 'multi',
+    style: judgeStyle.value,
     topic: multiTopic.value.trim().slice(0, MAX_TOPIC),
     perspectives: perspectives.value.map((item) => ({
       name: item.name.trim().slice(0, 20) || '当事人',
@@ -183,13 +186,14 @@ async function doSubmit(payload, options = {}) {
     }, { useUserKey: options.useUserKey === true })
 
     bumpLoadingProgress(100)
-    pushLoadingStatus('裁定完成')
+    pushLoadingStatus('分析完成')
 
     const id = await saveCase({
       mode: payload.mode,
       input: payload,
       result: typeof result === 'string' ? JSON.parse(result) : result,
     })
+    caseCount.value = getMyHistoryIds().length
 
     await new Promise((resolve) => setTimeout(resolve, 250))
     router.push(`/result/${id}`)
@@ -307,17 +311,34 @@ async function retryWithNewKey() {
               <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">写清楚怎么吵的，AI 帮你分析谁更有理，生成一页可以发给对方看的结果。</p>
             </div>
             <div class="stats-chip">
-              <span class="stats-chip__label">累计受理案例</span>
+              <span class="stats-chip__label">我的已生成</span>
               <span class="stats-chip__value">{{ caseCount.toLocaleString() }}</span>
             </div>
           </div>
 
-          <div class="mt-5">
-            <p class="text-xs font-medium text-slate-500">选一种方式</p>
-            <div class="mt-3 flex flex-wrap items-center gap-3">
-              <button :class="['mode-pill', mode === 'single' ? 'mode-pill--active' : '']" @click="mode = 'single'">我来写</button>
-              <button :class="['mode-pill', mode === 'multi' ? 'mode-pill--active' : '']" @click="mode = 'multi'; if (perspectives.length === 0) { addPerspective(); addPerspective() }">各方分别写</button>
-              <button class="text-sm text-brand-dark underline-offset-4 hover:underline" @click="loadDemo">看一个示例</button>
+          <div class="mt-5 grid gap-5 md:grid-cols-2">
+            <div>
+              <p class="text-xs font-medium text-slate-500">选一种方式</p>
+              <div class="mt-3 flex flex-wrap items-center gap-3">
+                <button :class="['mode-pill', mode === 'single' ? 'mode-pill--active' : '']" @click="mode = 'single'">我来写</button>
+                <button :class="['mode-pill', mode === 'multi' ? 'mode-pill--active' : '']" @click="mode = 'multi'; if (perspectives.length === 0) { addPerspective(); addPerspective() }">各方分别写</button>
+                <button class="text-sm text-brand-dark underline-offset-4 hover:underline" @click="loadDemo">看一个示例</button>
+              </div>
+            </div>
+            <div>
+              <p class="text-xs font-medium text-slate-500">AI 的风格</p>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button
+                  v-for="s in JUDGE_STYLES"
+                  :key="s.id"
+                  :class="['mode-pill', judgeStyle === s.id ? 'mode-pill--active' : '']"
+                  :title="s.desc"
+                  @click="judgeStyle = s.id"
+                >
+                  {{ s.label }}
+                </button>
+              </div>
+              <p class="mt-2 text-xs text-slate-400">{{ JUDGE_STYLES.find(s => s.id === judgeStyle)?.desc }}</p>
             </div>
           </div>
         </div>

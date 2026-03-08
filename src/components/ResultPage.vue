@@ -23,13 +23,26 @@ onMounted(async () => {
   }
 
   caseData.value = data
-  document.title = `${data.result?.summary || '评理结果'} · AI 吵架评理`
+  document.title = `${data.result?.summary || '本次判断'} · AI 吵架评理`
   votes.value = await getVotes(route.params.id)
   loading.value = false
 })
 
 const result = computed(() => caseData.value?.result || {})
 const inputData = computed(() => caseData.value?.input || {})
+const isPartialResult = computed(() => result.value.partial === true)
+
+function looksLikeJsonFragment(text) {
+  const value = String(text || '').trim()
+  if (!value) return false
+  if (value.startsWith('{') || value.startsWith('```')) return true
+  return /"(summary|winner|verdict|analysis|advice|scores)"\s*:/.test(value)
+}
+
+function normalizeVisibleText(text) {
+  return String(text || '').trim()
+}
+
 const normalizedScores = computed(() => {
   const entries = Object.entries(result.value.scores || {})
   if (entries.length === 0) return []
@@ -48,13 +61,34 @@ const normalizedScores = computed(() => {
   return entries
 })
 const sortedScores = computed(() => normalizedScores.value.slice().sort((a, b) => b[1] - a[1]))
+const hasScores = computed(() => sortedScores.value.length > 0)
+const scoreSpread = computed(() => {
+  if (sortedScores.value.length < 2) return sortedScores.value[0]?.[1] || 0
+  return sortedScores.value[0][1] - sortedScores.value[1][1]
+})
+const showScoreBoard = computed(() => hasScores.value && scoreSpread.value >= 5)
+const summaryText = computed(() => normalizeVisibleText(result.value.summary) || '本次判断已生成')
+const verdictText = computed(() => {
+  const text = normalizeVisibleText(result.value.verdict)
+  return looksLikeJsonFragment(text) ? '' : text
+})
+const analysisText = computed(() => {
+  const text = normalizeVisibleText(result.value.analysis)
+  return looksLikeJsonFragment(text) ? '' : text
+})
+const adviceText = computed(() => {
+  const text = normalizeVisibleText(result.value.advice)
+  return looksLikeJsonFragment(text) ? '' : text
+})
 const evidencePoints = computed(() => {
-  const text = result.value.analysis || ''
+  const text = analysisText.value || verdictText.value || summaryText.value
+  if (!text) return []
+
   return text
     .split(/\n+/)
     .flatMap((line) => line.split(/(?<=[。！？])/))
     .map((line) => line.trim())
-    .filter(Boolean)
+    .filter((line) => line && !looksLikeJsonFragment(line) && !/^[{}[\]",:]+$/.test(line))
     .slice(0, 5)
 })
 const winner = computed(() => {
@@ -62,7 +96,7 @@ const winner = computed(() => {
   if (sortedScores.value.length >= 2 && sortedScores.value[0][1] - sortedScores.value[1][1] >= 10) return sortedScores.value[0][0]
   return '难分高下'
 })
-const leadParty = computed(() => sortedScores.value[0]?.[0] || '待定')
+const leadParty = computed(() => sortedScores.value[0]?.[0] || (winner.value !== '难分高下' ? winner.value : '难分高下'))
 const leadMargin = computed(() => {
   if (sortedScores.value.length < 2) return sortedScores.value[0]?.[1] || 0
   return sortedScores.value[0][1] - sortedScores.value[1][1]
@@ -70,6 +104,17 @@ const leadMargin = computed(() => {
 const modeLabel = computed(() => inputData.value.mode === 'multi' ? '多方' : '单方')
 const createdAtLabel = computed(() => caseData.value?.created_at ? new Date(caseData.value.created_at).toLocaleString() : '')
 const isServerSynced = computed(() => caseData.value?._serverSynced !== false)
+const analysisDisplay = computed(() => {
+  if (analysisText.value) return analysisText.value
+  if (isPartialResult.value) return '这次结果没有完整生成，系统只恢复了部分字段，建议重新生成一次。'
+  return '这次结果没有生成可直接展示的分析。'
+})
+const adviceDisplay = computed(() => adviceText.value || '建议补充更多关键细节后再试一次。')
+const scoreSummary = computed(() => {
+  if (!hasScores.value) return '这次结果没有拿到可信分数，所以不展示分布条。'
+  if (!showScoreBoard.value) return '这次更接近平分，没有拉开明确差距，不建议硬分输赢。'
+  return ''
+})
 const caseNumber = computed(() => {
   const rawId = String(route.params.id || '')
   const slug = rawId.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase() || 'PENDING'
@@ -123,7 +168,7 @@ async function castVote(type) {
 
 function shareText() {
   const lead = sortedScores.value[0]
-  return `AI评理：${result.value.summary || '已出结果'}｜${lead ? `${lead[0]} ${lead[1]}%` : ''}`
+  return `AI评理：${summaryText.value}${lead ? `｜${lead[0]} ${lead[1]}%` : ''}`
 }
 
 async function nativeShare() {
@@ -162,15 +207,24 @@ function formatInputBlock(entry) {
           <section class="panel overflow-hidden">
             <div class="sheet-band">
               <div>
-                <p class="sheet-kicker">评理结果</p>
+                <p class="sheet-kicker">本次判断</p>
                 <p class="mt-2 text-sm text-slate-600">编号 {{ caseNumber }}</p>
               </div>
-              <div class="sheet-stamp">已出结果</div>
+              <div class="sheet-stamp">{{ isPartialResult ? '结果不完整' : '已出结果' }}</div>
             </div>
 
             <div class="p-6 md:p-8">
-              <h1 class="text-3xl font-semibold tracking-tight text-brand-dark md:text-4xl">{{ result.summary || '评理完成' }}</h1>
-              <p class="mt-4 text-lg leading-8 text-slate-700">{{ result.verdict }}</p>
+              <h1 class="text-3xl font-semibold tracking-tight text-brand-dark md:text-4xl">{{ summaryText }}</h1>
+              <p class="mt-4 text-lg leading-8 text-slate-700">{{ verdictText || '请结合下方依据和原始内容查看这次判断。' }}</p>
+
+              <div v-if="isPartialResult || !isServerSynced" class="mt-5 space-y-3">
+                <div v-if="isPartialResult" class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+                  这次结果没有完整生成，系统只恢复了部分字段。建议你重新生成一次，不要直接拿这版发给对方。
+                </div>
+                <div v-if="!isServerSynced" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
+                  这条结果当前只保存在这个浏览器里，还没有成功同步到服务器。
+                </div>
+              </div>
 
               <div class="sheet-meta-grid mt-6">
                 <div class="sheet-meta-card">
@@ -199,12 +253,13 @@ function formatInputBlock(entry) {
 
           <section class="panel p-6">
             <p class="sheet-kicker">判断依据</p>
-            <div class="mt-4 grid gap-3">
+            <div v-if="evidencePoints.length" class="mt-4 grid gap-3">
               <div v-for="(item, index) in evidencePoints" :key="`${index}-${item}`" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                 <p class="text-xs text-slate-500">第 {{ index + 1 }} 点</p>
                 <p class="mt-2 text-sm leading-7 text-slate-700">{{ item }}</p>
               </div>
             </div>
+            <p v-else class="mt-4 text-sm leading-7 text-slate-600">这次结果没有生成可直接展示的依据摘要，建议重新生成一次。</p>
           </section>
 
           <section class="panel p-6">
@@ -234,8 +289,8 @@ function formatInputBlock(entry) {
           </section>
 
           <section class="panel p-6">
-            <p class="sheet-kicker">各方得分</p>
-            <div class="mt-5 space-y-5">
+            <p class="sheet-kicker">倾向分布</p>
+            <div v-if="showScoreBoard" class="mt-5 space-y-5">
               <div v-for="([name, score], index) in sortedScores" :key="name">
                 <div class="mb-2 flex items-center justify-between">
                   <div class="flex items-center gap-3">
@@ -249,16 +304,17 @@ function formatInputBlock(entry) {
                 </div>
               </div>
             </div>
+            <p v-else class="mt-4 text-sm leading-7 text-slate-600">{{ scoreSummary }}</p>
           </section>
 
           <section class="panel p-6">
             <p class="sheet-kicker">详细分析</p>
-            <p class="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">{{ result.analysis }}</p>
+            <p class="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">{{ analysisDisplay }}</p>
           </section>
 
           <section class="panel p-6">
             <p class="sheet-kicker">给你们的建议</p>
-            <p class="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">{{ result.advice }}</p>
+            <p class="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">{{ adviceDisplay }}</p>
           </section>
         </div>
 
