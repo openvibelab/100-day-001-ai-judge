@@ -1,4 +1,9 @@
+<script setup>
+import { Analytics } from '@vercel/analytics/vue';
+</script>
+
 <template>
+  <Analytics />
   <div class="min-h-screen flex flex-col">
     <header class="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur-md">
       <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 md:px-6">
