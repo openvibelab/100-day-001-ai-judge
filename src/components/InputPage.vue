@@ -277,7 +277,7 @@ async function retryWithNewKey() {
     <div v-if="showQuotaModal" class="fixed inset-0 z-[90] flex items-end justify-center bg-black/40 px-4 py-6 sm:items-center" @click.self="showQuotaModal = false">
       <div class="panel w-full max-w-md p-6">
         <h3 class="text-xl font-semibold text-brand-dark">免费额度用完了</h3>
-        <p class="mt-2 text-sm text-slate-600">填入你自己的 API Key 就能继续，Key 只保存在你的浏览器里，不会上传。</p>
+        <p class="mt-2 text-sm text-slate-600">填入你自己的 API Key 后，这次请求会通过你的浏览器发给本站后端，再由后端转给模型服务。Key 不会写入数据库。</p>
         <div class="mt-5 grid grid-cols-3 gap-2">
           <button
             v-for="provider in [{ id: 'gemini', label: 'Gemini' }, { id: 'deepseek', label: 'DeepSeek' }, { id: 'openai', label: 'OpenAI' }]"
@@ -508,7 +508,7 @@ async function retryWithNewKey() {
                     <button class="btn-secondary flex-1" :disabled="!apiConfigured" @click="handleClearKey">清除</button>
                   </div>
 
-                  <p class="mt-3 text-xs leading-5 text-slate-500">Key 只保存在你的浏览器里，不会上传到服务器。</p>
+                  <p class="mt-3 text-xs leading-5 text-slate-500">Key 只保存在你的浏览器里，不会被写入数据库；真正调用时会随这次请求发到本站后端，再由后端转发给模型服务。</p>
                 </div>
               </Transition>
             </div>
