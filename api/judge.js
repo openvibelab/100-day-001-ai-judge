@@ -310,7 +310,7 @@ function parseResult(content) {
 const PROVIDERS = {
   gemini: {
     apiKey: () => getEnv('GEMINI_API_KEY', 'gemini_api_key'),
-    model: () => getEnv('GEMINI_MODEL', 'gemini_model') || 'gemini-2.0-flash',
+    model: () => getEnv('GEMINI_MODEL', 'gemini_model') || 'gemini-2.5-flash',
   },
   deepseek: {
     apiKey: () => getEnv('DEEPSEEK_API_KEY', 'deepseek_api_key'),

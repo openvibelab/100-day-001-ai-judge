@@ -307,7 +307,7 @@ async function retryWithNewKey() {
               <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">写清楚怎么吵的，AI 帮你分析谁更有理，生成一页可以发给对方看的结果。</p>
             </div>
             <div class="stats-chip">
-              <span class="stats-chip__label">已评理</span>
+              <span class="stats-chip__label">累计受理案例</span>
               <span class="stats-chip__value">{{ caseCount.toLocaleString() }}</span>
             </div>
           </div>
