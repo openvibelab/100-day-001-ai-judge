@@ -10,37 +10,41 @@ export const supabase = supabaseUrl && supabaseKey
 // ---- Helpers ----
 
 function generateId() {
-  // URL-safe, collision-resistant: timestamp + random
   const ts = Date.now().toString(36)
   const rand = crypto.getRandomValues(new Uint8Array(6))
   const randStr = Array.from(rand, b => b.toString(36).padStart(2, '0')).join('').slice(0, 8)
   return `${ts}-${randStr}`
 }
 
-const STORAGE_KEY = 'aj_cases'
+const CASES_KEY = 'aj_cases'
+const HISTORY_KEY = 'aj_my_history'
 
 function getLocalCases() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
-  } catch {
-    return {}
-  }
+  try { return JSON.parse(localStorage.getItem(CASES_KEY) || '{}') } catch { return {} }
 }
 
 function setLocalCases(cases) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cases))
-  } catch (e) {
-    // localStorage quota exceeded — clear old entries
-    console.warn('localStorage quota exceeded, clearing old cases')
+    localStorage.setItem(CASES_KEY, JSON.stringify(cases))
+  } catch {
+    // Quota exceeded — keep only recent 20
     const entries = Object.entries(cases)
-    if (entries.length > 10) {
+    if (entries.length > 20) {
       const recent = Object.fromEntries(
-        entries.sort((a, b) => b[1].created_at?.localeCompare(a[1].created_at)).slice(0, 10)
+        entries.sort((a, b) => (b[1].created_at || '').localeCompare(a[1].created_at || '')).slice(0, 20)
       )
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(recent))
+      try { localStorage.setItem(CASES_KEY, JSON.stringify(recent)) } catch { /* give up */ }
     }
   }
+}
+
+function addToHistory(id) {
+  try {
+    const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]')
+    history.unshift(id)
+    // Keep last 50
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 50)))
+  } catch { /* ignore */ }
 }
 
 // ---- Data API ----
@@ -51,21 +55,17 @@ export async function saveCase(data) {
 
   if (supabase) {
     const { error } = await supabase.from('cases').insert(record)
-    if (error) {
-      console.error('Supabase save error:', error)
-      // Don't throw — fall through to localStorage
-    }
+    if (error) console.error('Supabase save error:', error)
   }
 
-  // Always save locally as fallback
   const all = getLocalCases()
   all[id] = record
   setLocalCases(all)
+  addToHistory(id)
   return id
 }
 
 export async function getCase(id) {
-  // Try Supabase first
   if (supabase) {
     const { data, error } = await supabase
       .from('cases')
@@ -74,13 +74,49 @@ export async function getCase(id) {
       .single()
     if (data && !error) return data
   }
-
-  // Fallback to localStorage
   const all = getLocalCases()
   return all[id] || null
 }
 
-// ---- Phase 2 stubs ----
+export async function getCaseCount() {
+  if (supabase) {
+    const { count, error } = await supabase.from('cases').select('*', { count: 'exact', head: true })
+    if (!error && count !== null) return count
+  }
+  return Object.keys(getLocalCases()).length
+}
+
+export function getMyHistoryIds() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]') } catch { return [] }
+}
+
+export async function getMyHistory() {
+  const ids = getMyHistoryIds()
+  if (ids.length === 0) return []
+
+  if (supabase) {
+    const { data } = await supabase
+      .from('cases')
+      .select('id, mode, result, created_at')
+      .in('id', ids.slice(0, 20))
+      .order('created_at', { ascending: false })
+    if (data && data.length > 0) return data
+  }
+
+  // Fallback to localStorage
+  const all = getLocalCases()
+  return ids.slice(0, 20).map(id => all[id]).filter(Boolean)
+}
+
+export async function getRecentPublicCases(limit = 10) {
+  if (!supabase) return []
+  const { data } = await supabase
+    .from('cases')
+    .select('id, result, created_at')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  return data || []
+}
 
 export async function voteCase(id, vote /* 'up' | 'down' */) {
   if (!supabase) return
@@ -97,14 +133,4 @@ export async function getVotes(id) {
   const up = data?.filter(v => v.vote === 'up').length || 0
   const down = data?.filter(v => v.vote === 'down').length || 0
   return { up, down }
-}
-
-export async function listCases(page = 0, limit = 20) {
-  if (!supabase) return []
-  const { data } = await supabase
-    .from('cases')
-    .select('id, result, created_at')
-    .order('created_at', { ascending: false })
-    .range(page * limit, (page + 1) * limit - 1)
-  return data || []
 }
