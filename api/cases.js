@@ -1,4 +1,6 @@
-import { badMethod, getServiceSupabase, jsonResponse } from './_lib/supabase.js'
+export const config = { runtime: 'edge' }
+
+import { badMethod, getServiceSupabase, isTimeoutError, jsonResponse } from './_lib/supabase.js'
 
 export default async function handler(req) {
   if (req.method === 'POST') {
@@ -35,6 +37,9 @@ async function createCase(req) {
     return jsonResponse({ id: record.id })
   } catch (error) {
     console.error('Create case handler error:', error)
+    if (isTimeoutError(error)) {
+      return jsonResponse({ error: 'Supabase request timed out' }, 504)
+    }
     return jsonResponse({ error: 'Server error' }, 500)
   }
 }
@@ -93,7 +98,7 @@ async function queryCases(req) {
     if (wantCount) {
       const { count, error } = await supabase
         .from('cases')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'planned', head: true })
 
       if (error) {
         console.error('Get count error:', error)
@@ -122,6 +127,9 @@ async function queryCases(req) {
     return jsonResponse({ error: 'Missing query parameters' }, 400)
   } catch (error) {
     console.error('Query cases handler error:', error)
+    if (isTimeoutError(error)) {
+      return jsonResponse({ error: 'Supabase request timed out' }, 504)
+    }
     return jsonResponse({ error: 'Server error' }, 500)
   }
 }

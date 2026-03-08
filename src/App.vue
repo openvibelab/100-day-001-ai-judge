@@ -6,7 +6,7 @@
           <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-dark text-sm font-semibold text-white">判</span>
           <div class="min-w-0">
             <p class="truncate text-base font-semibold text-brand-dark">AI 吵架评理</p>
-            <p class="truncate text-xs text-slate-500">把争议讲清楚，拿到一份能发给对方看的判断</p>
+            <p class="truncate text-xs text-slate-500">冲突判定器 · 给出一页能发给对方看的结果</p>
           </div>
         </router-link>
         <nav class="flex items-center gap-2 text-sm">

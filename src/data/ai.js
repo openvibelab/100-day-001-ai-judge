@@ -25,41 +25,134 @@ export function hasUserApiKey() {
   return !!getUserApiKey()
 }
 
-export async function requestJudgment(payload) {
+function buildRequestBody(payload, options = {}) {
   const body = {
     system: buildSystemPrompt(),
     user: buildUserPrompt(payload),
   }
 
-  const userKey = getUserApiKey()
-  if (userKey) {
-    body.userApiKey = userKey
-    body.userProvider = getUserProvider()
+  if (options.useUserKey) {
+    const userKey = getUserApiKey()
+    if (userKey) {
+      body.userApiKey = userKey
+      body.userProvider = getUserProvider()
+    }
   }
 
+  return body
+}
+
+function buildRequestError(data, status) {
+  if (data.code === 'QUOTA_EXCEEDED') {
+    const err = new Error(data.error || '默认额度已用完')
+    err.code = 'QUOTA_EXCEEDED'
+    err.provider = data.provider || ''
+    err.detail = data.detail || ''
+    err.status = status
+    return err
+  }
+
+  if (data.code === 'INVALID_KEY') {
+    const err = new Error(data.error || 'API Key 无效，请检查后重试')
+    err.code = 'INVALID_KEY'
+    err.provider = data.provider || ''
+    err.detail = data.detail || ''
+    err.status = status
+    return err
+  }
+
+  const err = new Error(data.error || `请求失败: ${status}`)
+  err.code = data.code || 'REQUEST_FAILED'
+  err.provider = data.provider || ''
+  err.detail = data.detail || ''
+  err.status = status
+  return err
+}
+
+export async function requestJudgment(payload, options = {}) {
   const res = await fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(buildRequestBody(payload, options)),
   })
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    if (data.code === 'QUOTA_EXCEEDED') {
-      const err = new Error(data.error || '默认额度已用完')
-      err.code = 'QUOTA_EXCEEDED'
-      throw err
-    }
-    if (data.code === 'INVALID_KEY') {
-      const err = new Error(data.error || 'API Key 无效，请检查后重试')
-      err.code = 'INVALID_KEY'
-      throw err
-    }
-    throw new Error(data.error || `请求失败: ${res.status}`)
+    throw buildRequestError(data, res.status)
   }
 
   const data = await res.json()
   return data.result
+}
+
+export async function requestJudgmentStream(payload, callbacks = {}, options = {}) {
+  const res = await fetch(`${API_URL}?stream=1`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(buildRequestBody(payload, options)),
+  })
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw buildRequestError(data, res.status)
+  }
+
+  if (!res.body) {
+    return requestJudgment(payload, options)
+  }
+
+  const decoder = new TextDecoder()
+  const reader = res.body.getReader()
+  let buffer = ''
+  let fallbackText = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
+
+    let boundary = buffer.indexOf('\n\n')
+    while (boundary !== -1) {
+      const block = buffer.slice(0, boundary)
+      buffer = buffer.slice(boundary + 2)
+      boundary = buffer.indexOf('\n\n')
+
+      const dataLine = block
+        .split('\n')
+        .find((line) => line.startsWith('data:'))
+
+      if (!dataLine) continue
+
+      const raw = dataLine.slice(5).trim()
+      if (!raw) continue
+
+      const event = JSON.parse(raw)
+      if (event.type === 'meta') {
+        callbacks.onMeta?.(event)
+      } else if (event.type === 'status') {
+        callbacks.onStatus?.(event)
+      } else if (event.type === 'delta') {
+        fallbackText += event.text || ''
+        callbacks.onChunk?.(event)
+      } else if (event.type === 'result') {
+        callbacks.onComplete?.(event)
+        return event.result
+      } else if (event.type === 'error') {
+        throw buildRequestError(event, event.status || 500)
+      }
+    }
+
+    if (done) break
+  }
+
+  if (fallbackText.trim()) {
+    try {
+      return JSON.parse(fallbackText)
+    } catch {
+      throw new Error('流式响应已结束，但没有拿到完整结果')
+    }
+  }
+
+  throw new Error('流式响应已结束，但没有拿到结果')
 }
 
 function buildSystemPrompt() {

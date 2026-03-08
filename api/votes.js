@@ -1,4 +1,6 @@
-import { badMethod, getServiceSupabase, jsonResponse } from './_lib/supabase.js'
+export const config = { runtime: 'edge' }
+
+import { badMethod, getServiceSupabase, isTimeoutError, jsonResponse } from './_lib/supabase.js'
 
 export default async function handler(req) {
   if (req.method === 'POST') {
@@ -36,6 +38,9 @@ async function createVote(req) {
     return jsonResponse({ ok: true })
   } catch (error) {
     console.error('Create vote handler error:', error)
+    if (isTimeoutError(error)) {
+      return jsonResponse({ error: 'Supabase request timed out' }, 504)
+    }
     return jsonResponse({ error: 'Server error' }, 500)
   }
 }
@@ -66,6 +71,9 @@ async function getVotes(req) {
     return jsonResponse({ up, down })
   } catch (error) {
     console.error('Get votes handler error:', error)
+    if (isTimeoutError(error)) {
+      return jsonResponse({ error: 'Supabase request timed out' }, 504)
+    }
     return jsonResponse({ error: 'Server error' }, 500)
   }
 }

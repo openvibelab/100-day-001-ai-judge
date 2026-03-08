@@ -42,7 +42,7 @@ function addToHistory(id) {
 
 export async function saveCase(data) {
   const id = generateId()
-  const record = { id, ...data, created_at: new Date().toISOString() }
+  const record = { id, ...data, created_at: new Date().toISOString(), _serverSynced: false }
 
   try {
     const res = await fetch('/api/cases', {
@@ -54,6 +54,8 @@ export async function saveCase(data) {
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}))
       console.error('Server save error:', errorData.error || res.status)
+    } else {
+      record._serverSynced = true
     }
   } catch (error) {
     console.error('Server save request failed:', error)

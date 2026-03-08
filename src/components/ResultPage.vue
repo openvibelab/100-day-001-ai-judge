@@ -45,6 +45,23 @@ const winner = computed(() => {
   if (sortedScores.value.length >= 2 && sortedScores.value[0][1] - sortedScores.value[1][1] >= 10) return sortedScores.value[0][0]
   return '难分高下'
 })
+const leadParty = computed(() => sortedScores.value[0]?.[0] || '待定')
+const leadMargin = computed(() => {
+  if (sortedScores.value.length < 2) return sortedScores.value[0]?.[1] || 0
+  return sortedScores.value[0][1] - sortedScores.value[1][1]
+})
+const modeLabel = computed(() => inputData.value.mode === 'multi' ? '多方争议' : '单方描述')
+const createdAtLabel = computed(() => caseData.value?.created_at ? new Date(caseData.value.created_at).toLocaleString() : '')
+const isServerSynced = computed(() => caseData.value?._serverSynced !== false)
+const caseNumber = computed(() => {
+  const rawId = String(route.params.id || '')
+  const slug = rawId.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase() || 'PENDING'
+  const date = caseData.value?.created_at ? new Date(caseData.value.created_at) : new Date()
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `AJ-${y}${m}${d}-${slug}`
+})
 const hasVoted = computed(() => {
   try {
     return !!localStorage.getItem(votedKey.value)
@@ -111,7 +128,7 @@ function formatInputBlock(entry) {
 
 <template>
   <div class="page-surface min-h-full">
-    <div class="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-10">
+    <div class="mx-auto max-w-5xl px-4 py-8 md:px-6 md:py-10">
       <div v-if="loading" class="py-24 text-center">
         <div class="loading-mark mx-auto">判</div>
         <p class="mt-5 text-sm text-slate-500">正在加载结果</p>
@@ -123,20 +140,48 @@ function formatInputBlock(entry) {
         <router-link to="/" class="btn-primary mt-6">返回首页</router-link>
       </div>
 
-      <div v-else class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+      <div v-else class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
         <div class="space-y-5">
-          <section class="panel p-6 md:p-8">
-            <p class="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">裁定结果</p>
-            <h1 class="mt-3 text-3xl font-semibold tracking-tight text-brand-dark md:text-4xl">{{ result.summary || '评理完成' }}</h1>
-            <div class="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-600">
-              <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 font-medium text-brand-dark">裁定：{{ winner }}</span>
-              <span v-if="caseData?.created_at">生成于 {{ new Date(caseData.created_at).toLocaleString() }}</span>
+          <section class="panel overflow-hidden">
+            <div class="sheet-band">
+              <div>
+                <p class="sheet-kicker">裁决书</p>
+                <p class="mt-2 text-sm text-slate-600">案号 {{ caseNumber }}</p>
+              </div>
+              <div class="sheet-stamp">已裁定</div>
             </div>
-            <p class="mt-5 text-lg leading-8 text-slate-700">{{ result.verdict }}</p>
+
+            <div class="p-6 md:p-8">
+              <h1 class="text-3xl font-semibold tracking-tight text-brand-dark md:text-4xl">{{ result.summary || '评理完成' }}</h1>
+              <p class="mt-4 text-lg leading-8 text-slate-700">{{ result.verdict }}</p>
+
+              <div class="sheet-meta-grid mt-6">
+                <div class="sheet-meta-card">
+                  <p class="sheet-meta-label">受理类型</p>
+                  <p class="sheet-meta-value">{{ modeLabel }}</p>
+                </div>
+                <div class="sheet-meta-card">
+                  <p class="sheet-meta-label">判定结论</p>
+                  <p class="sheet-meta-value">{{ winner }}</p>
+                </div>
+                <div class="sheet-meta-card">
+                  <p class="sheet-meta-label">当前占优</p>
+                  <p class="sheet-meta-value">{{ leadParty }}</p>
+                </div>
+                <div class="sheet-meta-card">
+                  <p class="sheet-meta-label">领先幅度</p>
+                  <p class="sheet-meta-value">{{ leadMargin }} 分</p>
+                </div>
+              </div>
+
+              <div class="mt-6 border-t border-dashed border-slate-200 pt-4 text-sm text-slate-500">
+                <span v-if="createdAtLabel">生成于 {{ createdAtLabel }}</span>
+              </div>
+            </div>
           </section>
 
           <section class="panel p-6">
-            <h2 class="text-lg font-semibold text-brand-dark">这份判断依据什么得出</h2>
+            <p class="sheet-kicker">一、裁定依据</p>
             <div class="mt-4 grid gap-3">
               <div v-for="(item, index) in evidencePoints" :key="`${index}-${item}`" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.18em] text-slate-500">依据 {{ index + 1 }}</p>
@@ -146,11 +191,9 @@ function formatInputBlock(entry) {
           </section>
 
           <section class="panel p-6">
-            <div class="flex items-center justify-between gap-3">
-              <div>
-                <h2 class="text-lg font-semibold text-brand-dark">先核对原始输入</h2>
-                <p class="mt-1 text-sm text-slate-600">先确认 AI 理解的是不是你真正提交的内容。</p>
-              </div>
+            <p class="sheet-kicker">二、原始案情</p>
+            <div class="mt-4 flex items-center justify-between gap-3">
+              <p class="text-sm text-slate-600">先确认 AI 理解的是不是你真正提交的内容。</p>
               <button class="text-sm text-slate-500" @click="showInput = !showInput">{{ showInput ? '收起' : '展开' }}</button>
             </div>
 
@@ -174,7 +217,7 @@ function formatInputBlock(entry) {
           </section>
 
           <section class="panel p-6">
-            <h2 class="text-lg font-semibold text-brand-dark">有理程度</h2>
+            <p class="sheet-kicker">三、责任分布</p>
             <div class="mt-5 space-y-5">
               <div v-for="([name, score], index) in sortedScores" :key="name">
                 <div class="mb-2 flex items-center justify-between">
@@ -192,19 +235,19 @@ function formatInputBlock(entry) {
           </section>
 
           <section class="panel p-6">
-            <h2 class="text-lg font-semibold text-brand-dark">完整分析</h2>
+            <p class="sheet-kicker">四、完整分析</p>
             <p class="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">{{ result.analysis }}</p>
           </section>
 
           <section class="panel p-6">
-            <h2 class="text-lg font-semibold text-brand-dark">建议</h2>
+            <p class="sheet-kicker">五、执行建议</p>
             <p class="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">{{ result.advice }}</p>
           </section>
         </div>
 
         <aside class="space-y-4">
           <div class="panel p-5">
-            <p class="text-sm font-semibold text-brand-dark">分享这条裁定</p>
+            <p class="sheet-kicker">分享裁决</p>
             <p class="mt-2 text-sm leading-6 text-slate-600">复制链接发给对方，或者直接用系统分享。</p>
             <div class="mt-4 flex gap-3">
               <button class="btn-primary flex-1" @click="nativeShare">{{ copied ? '已复制' : '分享结果' }}</button>
@@ -213,7 +256,7 @@ function formatInputBlock(entry) {
           </div>
 
           <div class="panel p-5">
-            <p class="text-sm font-semibold text-brand-dark">这条结果靠谱吗？</p>
+            <p class="sheet-kicker">结果反馈</p>
             <p class="mt-2 text-sm leading-6 text-slate-600">可以直接点赞或点踩。每个浏览器对每条记录只计一次。</p>
             <div class="mt-4 grid grid-cols-2 gap-3">
               <button class="vote-btn" :disabled="hasVoted || voting" @click="castVote('up')">👍 有帮助 {{ votes.up }}</button>
@@ -223,8 +266,8 @@ function formatInputBlock(entry) {
           </div>
 
           <div class="panel p-5">
-            <p class="text-sm font-semibold text-brand-dark">社区记录</p>
-            <p class="mt-2 text-sm leading-6 text-slate-600">所有公开保存的案例都会进入社区列表，按最新时间排序。</p>
+            <p class="sheet-kicker">继续浏览</p>
+            <p class="mt-2 text-sm leading-6 text-slate-600">更多公开案例会进入社区列表，你可以继续看别人怎么吵、AI 怎么判。</p>
             <router-link to="/community" class="btn-secondary mt-4 w-full">去社区看看</router-link>
           </div>
         </aside>
