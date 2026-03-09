@@ -1,3 +1,5 @@
+[![中文版本](https://img.shields.io/badge/🇨🇳_中文版本-点击查看-blue?style=for-the-badge)](#中文版本)
+
 # AI Argument Judge
 
 Write down what happened in an argument — AI generates a shareable verdict page telling who's right.
@@ -128,8 +130,8 @@ MIT
 
 ---
 
-<details>
-<summary>🇨🇳 中文版本</summary>
+<details id="中文版本">
+<summary><h2>🇨🇳 中文版本</h2></summary>
 
 # AI 吵架评理
 
