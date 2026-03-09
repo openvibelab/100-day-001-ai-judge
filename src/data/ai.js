@@ -1,3 +1,5 @@
+import { t } from '../lib/i18n.js'
+
 const API_URL = import.meta.env.VITE_AI_API_URL || '/api/judge'
 
 const KEY_STORAGE = 'aj_user_api_key'
@@ -155,12 +157,23 @@ export async function requestJudgmentStream(payload, callbacks = {}, options = {
   throw new Error('流式响应已结束，但没有拿到结果')
 }
 
+export function getJudgeStyles() {
+  return [
+    { id: 'sharp', label: t('styleSharp'), desc: t('styleSharpDesc') },
+    { id: 'gentle', label: t('styleGentle'), desc: t('styleGentleDesc') },
+    { id: 'parent', label: t('styleParent'), desc: t('styleParentDesc') },
+    { id: 'melon', label: t('styleMelon'), desc: t('styleMelonDesc') },
+    { id: 'rational', label: t('styleRational'), desc: t('styleRationalDesc') },
+  ]
+}
+
+// Keep the static array for backward compat (style IDs only)
 export const JUDGE_STYLES = [
-  { id: 'sharp', label: '锐评', desc: '不留情面，直接判' },
-  { id: 'gentle', label: '温和', desc: '理解双方，重在化解' },
-  { id: 'parent', label: '家长', desc: '过来人口吻，有态度' },
-  { id: 'melon', label: '吃瓜', desc: '网友围观，辣评吐槽' },
-  { id: 'rational', label: '理性', desc: '逻辑拆解，就事论事' },
+  { id: 'sharp' },
+  { id: 'gentle' },
+  { id: 'parent' },
+  { id: 'melon' },
+  { id: 'rational' },
 ]
 
 const STYLE_INSTRUCTIONS = {

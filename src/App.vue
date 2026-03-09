@@ -3,16 +3,17 @@
     <header class="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur-md">
       <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 md:px-6">
         <router-link to="/" class="flex min-w-0 items-center gap-3">
-          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-dark text-sm font-semibold text-white">判</span>
+          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-dark text-sm font-semibold text-white">{{ t('appLogo') }}</span>
           <div class="min-w-0">
-            <p class="truncate text-base font-semibold text-brand-dark">AI 吵架评理</p>
-            <p class="truncate text-xs text-slate-500">吵完架，让 AI 说句公道话</p>
+            <p class="truncate text-base font-semibold text-brand-dark">{{ t('appTitle') }}</p>
+            <p class="truncate text-xs text-slate-500">{{ t('appSubtitle') }}</p>
           </div>
         </router-link>
         <nav class="flex items-center gap-2 text-sm">
           <a href="https://openvibelab.com" target="_blank" rel="noreferrer" class="nav-link hidden lg:inline-flex">OpenVibeLab</a>
-          <router-link to="/community" class="nav-link">社区</router-link>
-          <router-link to="/history" class="nav-link">历史</router-link>
+          <router-link to="/community" class="nav-link">{{ t('navCommunity') }}</router-link>
+          <router-link to="/history" class="nav-link">{{ t('navHistory') }}</router-link>
+          <LangToggle />
         </nav>
       </div>
     </header>
@@ -23,7 +24,12 @@
 
     <footer class="border-t border-slate-200 py-6 text-center text-sm text-slate-500">
       <a href="https://openvibelab.com" target="_blank" class="hover:text-brand-dark transition-colors">OpenVibeLab</a>
-      · 开源免费
+      · {{ t('footerOpenSource') }}
     </footer>
   </div>
 </template>
+
+<script setup>
+import { t } from './lib/i18n.js'
+import LangToggle from './components/LangToggle.vue'
+</script>

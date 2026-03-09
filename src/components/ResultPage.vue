@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { getCase, getVotes, voteCase } from '../data/supabase.js'
+import { t, locale, evidenceN } from '../lib/i18n.js'
 
 const route = useRoute()
 const caseData = ref(null)
@@ -23,7 +24,7 @@ onMounted(async () => {
   }
 
   caseData.value = data
-  document.title = `${data.result?.summary || '本次判断'} · AI 吵架评理`
+  document.title = `${data.result?.summary || t('resultTitle')} · ${t('appTitle')}`
   votes.value = await getVotes(route.params.id)
   loading.value = false
 })
@@ -51,11 +52,11 @@ const normalizedScores = computed(() => {
   const isGeneric = entries.every(([name]) => genericKeys.includes(name))
 
   if (isGeneric && inputData.value.mode === 'multi' && Array.isArray(inputData.value.perspectives)) {
-    return entries.map(([_, score], index) => [inputData.value.perspectives[index]?.name || `第${index + 1}方`, score])
+    return entries.map(([_, score], index) => [inputData.value.perspectives[index]?.name || `${locale.value === 'zh' ? '第' : 'Party '}${index + 1}${locale.value === 'zh' ? '方' : ''}`, score])
   }
 
   if (isGeneric && inputData.value.mode === 'single') {
-    return entries.map(([_, score], index) => [index === 0 ? '你' : '对方', score])
+    return entries.map(([_, score], index) => [index === 0 ? (locale.value === 'zh' ? '你' : 'You') : (locale.value === 'zh' ? '对方' : 'Other'), score])
   }
 
   return entries
@@ -67,7 +68,7 @@ const scoreSpread = computed(() => {
   return sortedScores.value[0][1] - sortedScores.value[1][1]
 })
 const showScoreBoard = computed(() => hasScores.value && scoreSpread.value >= 5)
-const summaryText = computed(() => normalizeVisibleText(result.value.summary) || '本次判断已生成')
+const summaryText = computed(() => normalizeVisibleText(result.value.summary) || t('verdictGenerated'))
 const verdictText = computed(() => {
   const text = normalizeVisibleText(result.value.verdict)
   return looksLikeJsonFragment(text) ? '' : text
@@ -94,25 +95,25 @@ const evidencePoints = computed(() => {
 const winner = computed(() => {
   if (result.value.winner && result.value.winner !== '难分高下') return result.value.winner
   if (sortedScores.value.length >= 2 && sortedScores.value[0][1] - sortedScores.value[1][1] >= 10) return sortedScores.value[0][0]
-  return '难分高下'
+  return t('tooClose')
 })
-const leadParty = computed(() => sortedScores.value[0]?.[0] || (winner.value !== '难分高下' ? winner.value : '难分高下'))
+const leadParty = computed(() => sortedScores.value[0]?.[0] || (winner.value !== t('tooClose') ? winner.value : t('tooClose')))
 const leadMargin = computed(() => {
   if (sortedScores.value.length < 2) return sortedScores.value[0]?.[1] || 0
   return sortedScores.value[0][1] - sortedScores.value[1][1]
 })
-const modeLabel = computed(() => inputData.value.mode === 'multi' ? '多方' : '单方')
+const modeLabel = computed(() => inputData.value.mode === 'multi' ? t('resultModeMulti') : t('resultModeSingle'))
 const createdAtLabel = computed(() => caseData.value?.created_at ? new Date(caseData.value.created_at).toLocaleString() : '')
 const isServerSynced = computed(() => caseData.value?._serverSynced !== false)
 const analysisDisplay = computed(() => {
   if (analysisText.value) return analysisText.value
-  if (isPartialResult.value) return '这次结果没有完整生成，系统只恢复了部分字段，建议重新生成一次。'
-  return '这次结果没有生成可直接展示的分析。'
+  if (isPartialResult.value) return t('incompleteWarning')
+  return t('noAnalysis')
 })
-const adviceDisplay = computed(() => adviceText.value || '建议补充更多关键细节后再试一次。')
+const adviceDisplay = computed(() => adviceText.value || t('tryMoreDetail'))
 const scoreSummary = computed(() => {
-  if (!hasScores.value) return '这次结果没有拿到可信分数，所以不展示分布条。'
-  if (!showScoreBoard.value) return '这次更接近平分，没有拉开明确差距，不建议硬分输赢。'
+  if (!hasScores.value) return t('noScore')
+  if (!showScoreBoard.value) return t('evenScore')
   return ''
 })
 const caseNumber = computed(() => {
@@ -168,13 +169,13 @@ async function castVote(type) {
 
 function shareText() {
   const lead = sortedScores.value[0]
-  return `AI评理：${summaryText.value}${lead ? `｜${lead[0]} ${lead[1]}%` : ''}`
+  return `${t('appTitle')}：${summaryText.value}${lead ? `｜${lead[0]} ${lead[1]}%` : ''}`
 }
 
 async function nativeShare() {
   if (navigator.share) {
     try {
-      await navigator.share({ title: 'AI 吵架评理', text: shareText(), url: shareUrl() })
+      await navigator.share({ title: t('appTitle'), text: shareText(), url: shareUrl() })
       return
     } catch {
       // ignore
@@ -184,7 +185,7 @@ async function nativeShare() {
 }
 
 function formatInputBlock(entry) {
-  return entry?.trim?.() || '未提供'
+  return entry?.trim?.() || t('notProvided')
 }
 </script>
 
@@ -192,14 +193,14 @@ function formatInputBlock(entry) {
   <div class="page-surface min-h-full">
     <div class="mx-auto max-w-5xl px-4 py-8 md:px-6 md:py-10">
       <div v-if="loading" class="py-24 text-center">
-        <div class="loading-mark mx-auto">判</div>
-        <p class="mt-5 text-sm text-slate-500">正在加载结果</p>
+        <div class="loading-mark mx-auto">{{ t('appLogo') }}</div>
+        <p class="mt-5 text-sm text-slate-500">{{ t('loading') }}</p>
       </div>
 
       <div v-else-if="notFound" class="panel py-20 text-center">
-        <h2 class="text-2xl font-semibold text-brand-dark">找不到这条记录</h2>
-        <p class="mt-3 text-slate-600">链接可能有误，或者数据没有成功保存。</p>
-        <router-link to="/" class="btn-primary mt-6">返回首页</router-link>
+        <h2 class="text-2xl font-semibold text-brand-dark">{{ t('notFound') }}</h2>
+        <p class="mt-3 text-slate-600">{{ t('notFoundDesc') }}</p>
+        <router-link to="/" class="btn-primary mt-6">{{ t('backHome') }}</router-link>
       </div>
 
       <div v-else class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
@@ -207,66 +208,66 @@ function formatInputBlock(entry) {
           <section class="panel overflow-hidden">
             <div class="sheet-band">
               <div>
-                <p class="sheet-kicker">本次判断</p>
-                <p class="mt-2 text-sm text-slate-600">编号 {{ caseNumber }}</p>
+                <p class="sheet-kicker">{{ t('resultTitle') }}</p>
+                <p class="mt-2 text-sm text-slate-600">{{ t('resultId') }} {{ caseNumber }}</p>
               </div>
-              <div class="sheet-stamp">{{ isPartialResult ? '结果不完整' : '已出结果' }}</div>
+              <div class="sheet-stamp">{{ isPartialResult ? t('resultIncomplete') : t('resultReady') }}</div>
             </div>
 
             <div class="p-6 md:p-8">
               <h1 class="text-3xl font-semibold tracking-tight text-brand-dark md:text-4xl">{{ summaryText }}</h1>
-              <p class="mt-4 text-lg leading-8 text-slate-700">{{ verdictText || '请结合下方依据和原始内容查看这次判断。' }}</p>
+              <p class="mt-4 text-lg leading-8 text-slate-700">{{ verdictText || t('resultViewHint') }}</p>
 
               <div v-if="isPartialResult || !isServerSynced" class="mt-5 space-y-3">
                 <div v-if="isPartialResult" class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-                  这次结果没有完整生成，系统只恢复了部分字段。建议你重新生成一次，不要直接拿这版发给对方。
+                  {{ t('resultIncompleteHint') }}
                 </div>
                 <div v-if="!isServerSynced" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
-                  这条结果当前只保存在这个浏览器里，还没有成功同步到服务器。
+                  {{ t('resultLocalOnly') }}
                 </div>
               </div>
 
               <div class="sheet-meta-grid mt-6">
                 <div class="sheet-meta-card">
-                  <p class="sheet-meta-label">提交方式</p>
+                  <p class="sheet-meta-label">{{ t('submitMode') }}</p>
                   <p class="sheet-meta-value">{{ modeLabel }}</p>
                 </div>
                 <div class="sheet-meta-card">
-                  <p class="sheet-meta-label">谁更有理</p>
+                  <p class="sheet-meta-label">{{ t('whoRight') }}</p>
                   <p class="sheet-meta-value">{{ winner }}</p>
                 </div>
                 <div class="sheet-meta-card">
-                  <p class="sheet-meta-label">当前占优</p>
+                  <p class="sheet-meta-label">{{ t('currentLead') }}</p>
                   <p class="sheet-meta-value">{{ leadParty }}</p>
                 </div>
                 <div class="sheet-meta-card">
-                  <p class="sheet-meta-label">领先幅度</p>
-                  <p class="sheet-meta-value">{{ leadMargin }} 分</p>
+                  <p class="sheet-meta-label">{{ t('leadMargin') }}</p>
+                  <p class="sheet-meta-value">{{ leadMargin }} {{ t('points') }}</p>
                 </div>
               </div>
 
               <div class="mt-6 border-t border-dashed border-slate-200 pt-4 text-sm text-slate-500">
-                <span v-if="createdAtLabel">生成于 {{ createdAtLabel }}</span>
+                <span v-if="createdAtLabel">{{ t('generatedAt') }} {{ createdAtLabel }}</span>
               </div>
             </div>
           </section>
 
           <section class="panel p-6">
-            <p class="sheet-kicker">判断依据</p>
+            <p class="sheet-kicker">{{ t('evidence') }}</p>
             <div v-if="evidencePoints.length" class="mt-4 grid gap-3">
               <div v-for="(item, index) in evidencePoints" :key="`${index}-${item}`" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <p class="text-xs text-slate-500">第 {{ index + 1 }} 点</p>
+                <p class="text-xs text-slate-500">{{ evidenceN(index + 1) }}</p>
                 <p class="mt-2 text-sm leading-7 text-slate-700">{{ item }}</p>
               </div>
             </div>
-            <p v-else class="mt-4 text-sm leading-7 text-slate-600">这次结果没有生成可直接展示的依据摘要，建议重新生成一次。</p>
+            <p v-else class="mt-4 text-sm leading-7 text-slate-600">{{ t('noEvidence') }}</p>
           </section>
 
           <section class="panel p-6">
-            <p class="sheet-kicker">你提交的内容</p>
+            <p class="sheet-kicker">{{ t('yourContent') }}</p>
             <div class="mt-4 flex items-center justify-between gap-3">
-              <p class="text-sm text-slate-600">确认一下 AI 看到的是不是你写的那些。</p>
-              <button class="text-sm text-slate-500" @click="showInput = !showInput">{{ showInput ? '收起' : '展开' }}</button>
+              <p class="text-sm text-slate-600">{{ t('yourContentHint') }}</p>
+              <button class="text-sm text-slate-500" @click="showInput = !showInput">{{ showInput ? t('collapse') : t('expand') }}</button>
             </div>
 
             <div v-if="showInput" class="mt-5 space-y-4">
@@ -277,7 +278,7 @@ function formatInputBlock(entry) {
               </template>
               <template v-else>
                 <div class="rounded-2xl bg-slate-50 p-4">
-                  <p class="text-xs text-slate-500">争议主题</p>
+                  <p class="text-xs text-slate-500">{{ t('disputeTopic') }}</p>
                   <p class="mt-2 text-sm leading-7 text-slate-700">{{ formatInputBlock(inputData.topic) }}</p>
                 </div>
                 <div v-for="entry in inputData.perspectives || []" :key="entry.name" class="rounded-2xl border border-slate-200 p-4">
@@ -289,7 +290,7 @@ function formatInputBlock(entry) {
           </section>
 
           <section class="panel p-6">
-            <p class="sheet-kicker">倾向分布</p>
+            <p class="sheet-kicker">{{ t('scoreDistribution') }}</p>
             <div v-if="showScoreBoard" class="mt-5 space-y-5">
               <div v-for="([name, score], index) in sortedScores" :key="name">
                 <div class="mb-2 flex items-center justify-between">
@@ -308,40 +309,40 @@ function formatInputBlock(entry) {
           </section>
 
           <section class="panel p-6">
-            <p class="sheet-kicker">详细分析</p>
+            <p class="sheet-kicker">{{ t('detailedAnalysis') }}</p>
             <p class="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">{{ analysisDisplay }}</p>
           </section>
 
           <section class="panel p-6">
-            <p class="sheet-kicker">给你们的建议</p>
+            <p class="sheet-kicker">{{ t('advice') }}</p>
             <p class="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">{{ adviceDisplay }}</p>
           </section>
         </div>
 
         <aside class="space-y-4">
           <div class="panel p-5">
-            <p class="sheet-kicker">发给对方看</p>
-            <p class="mt-2 text-sm leading-6 text-slate-600">复制链接发过去，让对方也看看 AI 怎么说。</p>
+            <p class="sheet-kicker">{{ t('shareTitle') }}</p>
+            <p class="mt-2 text-sm leading-6 text-slate-600">{{ t('shareDesc') }}</p>
             <div class="mt-4 flex gap-3">
-              <button class="btn-primary flex-1" @click="nativeShare">{{ copied ? '已复制' : '分享结果' }}</button>
-              <router-link to="/" class="btn-secondary flex-1">再评一次</router-link>
+              <button class="btn-primary flex-1" @click="nativeShare">{{ copied ? t('copied') : t('shareResult') }}</button>
+              <router-link to="/" class="btn-secondary flex-1">{{ t('judgeAgain') }}</router-link>
             </div>
           </div>
 
           <div class="panel p-5">
-            <p class="sheet-kicker">你觉得判得怎样？</p>
-            <p class="mt-2 text-sm leading-6 text-slate-600">点赞或点踩，每条只能投一次。</p>
+            <p class="sheet-kicker">{{ t('voteTitle') }}</p>
+            <p class="mt-2 text-sm leading-6 text-slate-600">{{ t('voteDesc') }}</p>
             <div class="mt-4 grid grid-cols-2 gap-3">
-              <button class="vote-btn" :disabled="hasVoted || voting" @click="castVote('up')">👍 有帮助 {{ votes.up }}</button>
-              <button class="vote-btn" :disabled="hasVoted || voting" @click="castVote('down')">👎 不认可 {{ votes.down }}</button>
+              <button class="vote-btn" :disabled="hasVoted || voting" @click="castVote('up')">👍 {{ t('voteUp') }} {{ votes.up }}</button>
+              <button class="vote-btn" :disabled="hasVoted || voting" @click="castVote('down')">👎 {{ t('voteDown') }} {{ votes.down }}</button>
             </div>
-            <p v-if="hasVoted" class="mt-3 text-xs text-slate-500">你已经投过票了。</p>
+            <p v-if="hasVoted" class="mt-3 text-xs text-slate-500">{{ t('alreadyVoted') }}</p>
           </div>
 
           <div class="panel p-5">
-            <p class="sheet-kicker">看看别人的</p>
-            <p class="mt-2 text-sm leading-6 text-slate-600">去社区看看别人都在吵什么，AI 又是怎么判的。</p>
-            <router-link to="/community" class="btn-secondary mt-4 w-full">去社区看看</router-link>
+            <p class="sheet-kicker">{{ t('communityTitle') }}</p>
+            <p class="mt-2 text-sm leading-6 text-slate-600">{{ t('communityDesc') }}</p>
+            <router-link to="/community" class="btn-secondary mt-4 w-full">{{ t('goToCommunity') }}</router-link>
           </div>
         </aside>
       </div>

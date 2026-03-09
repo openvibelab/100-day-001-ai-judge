@@ -1,101 +1,84 @@
-# AI 吵架评理
+# AI Argument Judge
 
-把争执经过写下来，生成一页可以直接发给对方看的判断结果。
+Write down what happened in an argument — AI generates a shareable verdict page telling who's right.
 
-在线地址: `https://judge.openvibelab.com`
+**Live:** [judge.openvibelab.com](https://judge.openvibelab.com)
 
-## 当前状态
+## Features
 
-- 前端: Vue 3 + Vite + Vue Router + Tailwind CSS
-- AI 接入: Vercel Edge Function
-- 默认模型: Gemini `gemini-2.5-flash`
-- 备用模型: DeepSeek / OpenAI
-- 数据存储: Supabase
-- 本地兜底: localStorage
+- **Single mode** — One person describes the whole argument
+- **Multi-party mode** — Up to 6 people each give their side
+- **5 judge styles** — Sharp, Gentle, Parent, Melon-eater (bystander), Rational
+- **Streaming output** — Real-time AI response with model info
+- **Verdict page** — Summary, conclusion, analysis, advice, and scores
+- **Community feed** — Browse recent cases, sort by popularity, upvote/downvote
+- **History** — View your past cases
+- **Bring your own key** — When free quota runs out, use your own Gemini/DeepSeek/OpenAI key
 
-## 主要功能
+## Tech Stack
 
-- 单方录入: 一个人完整描述事件经过
-- 多方录入: 最多 6 方分别陈述
-- 流式生成: 提交后显示模型、过程和实时输出
-- 结果页: 摘要、结论、分析、建议、分数
-- 社区页: 最近案例、热度排序、点赞点踩
-- 历史页: 查看自己生成过的案例
-- 浏览器 Key: 免费额度不够时，可临时切到用户自己的 API Key
+- **Frontend:** Vue 3 + Vite + Vue Router + Tailwind CSS
+- **Backend:** Vercel Edge Functions
+- **AI:** Gemini `gemini-2.5-flash` (primary), DeepSeek / OpenAI (fallback)
+- **Database:** Supabase (server-side) + localStorage (fallback)
+- **Analytics:** Vercel Analytics
 
-## 请求链路
+## Request Flow
 
-```text
-Browser
-  -> /api/judge?stream=1
-  -> Vercel Edge Function
-  -> Gemini / DeepSeek / OpenAI
-  -> 返回结构化结果
-  -> /api/cases
-  -> Supabase
+```
+Browser → /api/judge?stream=1 → Vercel Edge Function → Gemini / DeepSeek / OpenAI
+                                                       ↓
+                                              structured verdict
+                                                       ↓
+                                         /api/cases → Supabase
 ```
 
-说明:
+- Server env keys are used by default
+- Only when server quota is exhausted does the UI prompt for a user key
+- User keys are stored in browser localStorage only (never in the database)
+- User keys are sent to the server per-request for proxying to the AI provider
 
-- 默认优先使用服务端环境变量里的模型 Key
-- 只有服务端额度受限时，才会提示用户填自己的 Key
-- 用户自己的 Key 只保存在浏览器 localStorage，不写入数据库
-- 但真正调用时，这把 Key 会随本次请求发到本站后端，再由后端转发给模型服务
-
-## 本地开发
+## Getting Started
 
 ```bash
+git clone https://github.com/openvibelab/100-day-001-ai-judge.git
+cd 100-day-001-ai-judge
 npm install
 npm run dev
 ```
 
-默认开发地址:
+Open [http://localhost:5173](http://localhost:5173)
 
-```text
-http://localhost:5173
-```
+## Environment Variables
 
-## 环境变量
-
-至少需要一组 AI Key 才能生成结果。
+See `.env.example`. At minimum you need one AI key:
 
 ```env
 GEMINI_API_KEY=
-DEEPSEEK_API_KEY=
-OPENAI_API_KEY=
 ```
 
-可选变量:
+Optional fallback providers:
 
 ```env
-GEMINI_MODEL=gemini-2.5-flash
-
+DEEPSEEK_API_KEY=
 DEEPSEEK_MODEL=deepseek-chat
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 
+OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_BASE_URL=https://api.openai.com
 ```
 
-如果要启用服务端持久化和社区页，还需要:
+For server-side persistence and community features:
 
 ```env
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
-兼容旧变量名:
+## Supabase Setup
 
-- `gemini_api_key`
-- `deepseek_api_key`
-- `openai_api_key`
-- `service_role_key`
-
-但生产建议统一使用标准大写变量名。
-
-## Supabase 初始化
-
-在 Supabase `SQL Editor` 执行:
+Run in Supabase SQL Editor:
 
 ```sql
 create table if not exists public.cases (
@@ -117,17 +100,11 @@ alter table public.cases enable row level security;
 alter table public.votes enable row level security;
 ```
 
-这个项目当前使用 `service_role key` 由服务端写库，所以不需要给匿名用户配置公开写入策略。
+Uses `service_role key` for server-side writes — no anonymous access policies needed.
 
-## Vercel 部署
+## Deployment (Vercel)
 
-Root Directory:
-
-```text
-100-day-001-ai-judge
-```
-
-推荐最少环境变量:
+Set root directory to `100-day-001-ai-judge`. Minimum env vars:
 
 ```env
 GEMINI_API_KEY=...
@@ -135,56 +112,70 @@ SUPABASE_URL=...
 SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
-如果你希望服务端在 Gemini 失败时自动切换，额外再配一组:
+Add `DEEPSEEK_API_KEY` or `OPENAI_API_KEY` for automatic failover.
 
-```env
-DEEPSEEK_API_KEY=...
+## Troubleshooting
+
+| Problem | Cause | Fix |
+|---------|-------|-----|
+| "Free quota exhausted" | Server AI key rate-limited | Wait, add backup key, or use your own key |
+| Scores show 50/50 | Structured result parsing failed | Check `/api/judge` logs, verify model name |
+| `/api/cases` returns 502 | Supabase config issue | Verify `SUPABASE_URL` and `SERVICE_ROLE_KEY`, check tables exist |
+
+## License
+
+MIT
+
+---
+
+<details>
+<summary>🇨🇳 中文版本</summary>
+
+# AI 吵架评理
+
+把争执经过写下来，生成一页可以直接发给对方看的判断结果。
+
+**在线地址:** [judge.openvibelab.com](https://judge.openvibelab.com)
+
+## 主要功能
+
+- **单方录入** — 一个人完整描述事件经过
+- **多方录入** — 最多 6 方分别陈述
+- **5 种风格** — 锐评、温和、家长、吃瓜、理性
+- **流式生成** — 提交后显示模型、过程和实时输出
+- **结果页** — 摘要、结论、分析、建议、分数
+- **社区页** — 最近案例、热度排序、点赞点踩
+- **历史页** — 查看自己生成过的案例
+- **浏览器 Key** — 免费额度不够时，可临时切到用户自己的 API Key
+
+## 本地开发
+
+```bash
+npm install
+npm run dev
 ```
 
-或:
+默认开发地址: http://localhost:5173
+
+## 环境变量
+
+至少需要一组 AI Key 才能生成结果。参考 `.env.example`。
+
+如果要启用服务端持久化和社区页，还需要:
 
 ```env
-OPENAI_API_KEY=...
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
 ```
 
 ## 常见问题
 
-### 1. 页面提示“免费额度用完了”
-
-表示服务端默认 AI Key 当前被限流或额度受限。
-
-处理方式:
-
-1. 稍后再试
-2. 配置备用服务端 Key
-3. 在页面里填自己的 API Key 继续
-
-### 2. 结果页出现“评理完成 / A 50 / B 50”
-
-这是结构化结果解析失败时的兜底表现，不是正常结果。
-
-通常需要检查:
-
-- `/api/judge` 日志
-- 当前 Gemini 模型名是否可用
-- 上游流式返回是否完整
-
-### 3. `/api/cases` 或 `/api/votes` 返回 502
-
-通常是 Supabase 配置问题。
-
-优先检查:
-
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `cases` / `votes` 表是否已创建
-
-## 构建
-
-```bash
-npm run build
-```
+1. **页面提示"免费额度用完了"** — 服务端 AI Key 被限流。稍后再试，或在页面里填自己的 Key。
+2. **结果页出现 50/50** — 结构化结果解析失败，检查 `/api/judge` 日志和模型名。
+3. **`/api/cases` 返回 502** — Supabase 配置问题，检查 URL 和 Key。
 
 ## 许可
 
 MIT
+
+</details>
