@@ -36,16 +36,16 @@ const visibleCases = computed(() => cases.value.filter((item) => modeFilter.valu
     <div class="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-10">
       <div class="mb-6 flex items-end justify-between gap-4">
         <div>
-          <h1 class="text-3xl font-semibold tracking-tight text-brand-dark">{{ t('historyTitle') }}</h1>
+          <h1 class="text-3xl font-semibold tracking-tight font-serif text-ink">{{ t('historyTitle') }}</h1>
         </div>
         <router-link to="/" class="btn-secondary">{{ t('backHome') }}</router-link>
       </div>
 
-      <div v-if="loading" class="py-24 text-center text-sm text-slate-500">{{ t('historyLoading') }}</div>
+      <div v-if="loading" class="py-24 text-center text-sm text-ink-muted">{{ t('historyLoading') }}</div>
 
       <div v-else-if="cases.length === 0" class="panel py-20 text-center">
-        <h2 class="text-2xl font-semibold text-brand-dark">{{ t('historyEmpty') }}</h2>
-        <p class="mt-3 text-slate-600">{{ t('historyEmptyDesc') }}</p>
+        <h2 class="text-2xl font-semibold text-ink">{{ t('historyEmpty') }}</h2>
+        <p class="mt-3 text-ink-secondary">{{ t('historyEmptyDesc') }}</p>
         <router-link to="/" class="btn-primary mt-6">{{ t('goJudge') }}</router-link>
       </div>
 
@@ -66,20 +66,20 @@ const visibleCases = computed(() => cases.value.filter((item) => modeFilter.valu
             <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div class="min-w-0 flex-1">
                 <div class="mb-3 flex flex-wrap items-center gap-2">
-                  <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">{{ item.mode === 'multi' ? t('filterMulti') : t('filterSingle') }}</span>
-                  <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">👍 {{ voteMap[item.id]?.up || 0 }} / 👎 {{ voteMap[item.id]?.down || 0 }}</span>
+                  <span class="inline-flex rounded-full bg-surface px-3 py-1 text-xs font-medium text-ink-secondary">{{ item.mode === 'multi' ? t('filterMulti') : t('filterSingle') }}</span>
+                  <span class="inline-flex rounded-full bg-surface px-3 py-1 text-xs font-medium text-ink-secondary">👍 {{ voteMap[item.id]?.up || 0 }} / 👎 {{ voteMap[item.id]?.down || 0 }}</span>
                 </div>
-                <p class="text-xl font-semibold text-brand-dark">{{ item.result?.summary || t('caseRecord') }}</p>
-                <p class="mt-2 text-sm leading-7 text-slate-700">{{ item.result?.verdict || t('noSummary') }}</p>
-                <p class="mt-3 text-sm leading-7 text-slate-600">{{ item.result?.analysis || '' }}</p>
+                <p class="text-xl font-semibold text-ink">{{ item.result?.summary || t('caseRecord') }}</p>
+                <p class="mt-2 text-sm leading-7 text-ink">{{ item.result?.verdict || t('noSummary') }}</p>
+                <p class="mt-3 text-sm leading-7 text-ink-secondary">{{ item.result?.analysis || '' }}</p>
               </div>
-              <div class="w-full shrink-0 rounded-2xl bg-slate-50 p-4 md:w-56">
-                <p class="text-xs text-slate-500">{{ t('topScore') }}</p>
+              <div class="w-full shrink-0 rounded-2xl bg-surface p-4 md:w-56">
+                <p class="text-xs text-ink-muted">{{ t('topScore') }}</p>
                 <div v-if="topParty(item.result)" class="mt-3">
-                  <p class="text-2xl font-semibold text-brand-dark">{{ topParty(item.result)[1] }}%</p>
-                  <p class="mt-1 text-sm text-slate-600">{{ topParty(item.result)[0] }}</p>
+                  <p class="text-2xl font-semibold text-ink">{{ topParty(item.result)[1] }}%</p>
+                  <p class="mt-1 text-sm text-ink-secondary">{{ topParty(item.result)[0] }}</p>
                 </div>
-                <p class="mt-4 text-xs text-slate-500">{{ formatDate(item.created_at) }}</p>
+                <p class="mt-4 text-xs text-ink-muted">{{ formatDate(item.created_at) }}</p>
               </div>
             </div>
           </router-link>

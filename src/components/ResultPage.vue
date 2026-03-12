@@ -194,12 +194,12 @@ function formatInputBlock(entry) {
     <div class="mx-auto max-w-5xl px-4 py-8 md:px-6 md:py-10">
       <div v-if="loading" class="py-24 text-center">
         <div class="loading-mark mx-auto">{{ t('appLogo') }}</div>
-        <p class="mt-5 text-sm text-slate-500">{{ t('loading') }}</p>
+        <p class="mt-5 text-sm text-ink-muted">{{ t('loading') }}</p>
       </div>
 
       <div v-else-if="notFound" class="panel py-20 text-center">
-        <h2 class="text-2xl font-semibold text-brand-dark">{{ t('notFound') }}</h2>
-        <p class="mt-3 text-slate-600">{{ t('notFoundDesc') }}</p>
+        <h2 class="text-2xl font-semibold text-ink">{{ t('notFound') }}</h2>
+        <p class="mt-3 text-ink-secondary">{{ t('notFoundDesc') }}</p>
         <router-link to="/" class="btn-primary mt-6">{{ t('backHome') }}</router-link>
       </div>
 
@@ -209,20 +209,20 @@ function formatInputBlock(entry) {
             <div class="sheet-band">
               <div>
                 <p class="sheet-kicker">{{ t('resultTitle') }}</p>
-                <p class="mt-2 text-sm text-slate-600">{{ t('resultId') }} {{ caseNumber }}</p>
+                <p class="mt-2 text-sm text-ink-secondary">{{ t('resultId') }} {{ caseNumber }}</p>
               </div>
               <div class="sheet-stamp">{{ isPartialResult ? t('resultIncomplete') : t('resultReady') }}</div>
             </div>
 
             <div class="p-6 md:p-8">
-              <h1 class="text-3xl font-semibold tracking-tight text-brand-dark md:text-4xl">{{ summaryText }}</h1>
-              <p class="mt-4 text-lg leading-8 text-slate-700">{{ verdictText || t('resultViewHint') }}</p>
+              <h1 class="font-serif text-3xl font-semibold tracking-tight text-ink md:text-4xl">{{ summaryText }}</h1>
+              <p class="mt-4 text-lg leading-8 text-ink">{{ verdictText || t('resultViewHint') }}</p>
 
               <div v-if="isPartialResult || !isServerSynced" class="mt-5 space-y-3">
                 <div v-if="isPartialResult" class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
                   {{ t('resultIncompleteHint') }}
                 </div>
-                <div v-if="!isServerSynced" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
+                <div v-if="!isServerSynced" class="rounded-2xl border border-surface-warm bg-surface px-4 py-3 text-sm leading-6 text-ink">
                   {{ t('resultLocalOnly') }}
                 </div>
               </div>
@@ -246,7 +246,7 @@ function formatInputBlock(entry) {
                 </div>
               </div>
 
-              <div class="mt-6 border-t border-dashed border-slate-200 pt-4 text-sm text-slate-500">
+              <div class="mt-6 border-t border-dashed border-surface-warm pt-4 text-sm text-ink-muted">
                 <span v-if="createdAtLabel">{{ t('generatedAt') }} {{ createdAtLabel }}</span>
               </div>
             </div>
@@ -255,35 +255,35 @@ function formatInputBlock(entry) {
           <section class="panel p-6">
             <p class="sheet-kicker">{{ t('evidence') }}</p>
             <div v-if="evidencePoints.length" class="mt-4 grid gap-3">
-              <div v-for="(item, index) in evidencePoints" :key="`${index}-${item}`" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <p class="text-xs text-slate-500">{{ evidenceN(index + 1) }}</p>
-                <p class="mt-2 text-sm leading-7 text-slate-700">{{ item }}</p>
+              <div v-for="(item, index) in evidencePoints" :key="`${index}-${item}`" class="rounded-2xl border border-surface-warm bg-surface px-4 py-3">
+                <p class="text-xs text-ink-muted">{{ evidenceN(index + 1) }}</p>
+                <p class="mt-2 text-sm leading-7 text-ink">{{ item }}</p>
               </div>
             </div>
-            <p v-else class="mt-4 text-sm leading-7 text-slate-600">{{ t('noEvidence') }}</p>
+            <p v-else class="mt-4 text-sm leading-7 text-ink-secondary">{{ t('noEvidence') }}</p>
           </section>
 
           <section class="panel p-6">
             <p class="sheet-kicker">{{ t('yourContent') }}</p>
             <div class="mt-4 flex items-center justify-between gap-3">
-              <p class="text-sm text-slate-600">{{ t('yourContentHint') }}</p>
-              <button class="text-sm text-slate-500" @click="showInput = !showInput">{{ showInput ? t('collapse') : t('expand') }}</button>
+              <p class="text-sm text-ink-secondary">{{ t('yourContentHint') }}</p>
+              <button class="text-sm text-ink-muted" @click="showInput = !showInput">{{ showInput ? t('collapse') : t('expand') }}</button>
             </div>
 
             <div v-if="showInput" class="mt-5 space-y-4">
               <template v-if="inputData.mode === 'single'">
-                <div class="rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-700 whitespace-pre-line">
+                <div class="rounded-2xl bg-surface p-4 text-sm leading-7 text-ink whitespace-pre-line">
                   {{ formatInputBlock(inputData.content) }}
                 </div>
               </template>
               <template v-else>
-                <div class="rounded-2xl bg-slate-50 p-4">
-                  <p class="text-xs text-slate-500">{{ t('disputeTopic') }}</p>
-                  <p class="mt-2 text-sm leading-7 text-slate-700">{{ formatInputBlock(inputData.topic) }}</p>
+                <div class="rounded-2xl bg-surface p-4">
+                  <p class="text-xs text-ink-muted">{{ t('disputeTopic') }}</p>
+                  <p class="mt-2 text-sm leading-7 text-ink">{{ formatInputBlock(inputData.topic) }}</p>
                 </div>
-                <div v-for="entry in inputData.perspectives || []" :key="entry.name" class="rounded-2xl border border-slate-200 p-4">
-                  <p class="text-sm font-semibold text-brand-dark">{{ entry.name }}</p>
-                  <p class="mt-2 text-sm leading-7 text-slate-700 whitespace-pre-line">{{ formatInputBlock(entry.content) }}</p>
+                <div v-for="entry in inputData.perspectives || []" :key="entry.name" class="rounded-2xl border border-surface-warm p-4">
+                  <p class="text-sm font-semibold text-ink">{{ entry.name }}</p>
+                  <p class="mt-2 text-sm leading-7 text-ink whitespace-pre-line">{{ formatInputBlock(entry.content) }}</p>
                 </div>
               </template>
             </div>
@@ -296,33 +296,33 @@ function formatInputBlock(entry) {
                 <div class="mb-2 flex items-center justify-between">
                   <div class="flex items-center gap-3">
                     <span class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-dark text-sm font-semibold text-white">{{ index + 1 }}</span>
-                    <span class="text-base font-medium text-slate-800">{{ name }}</span>
+                    <span class="text-base font-medium text-ink">{{ name }}</span>
                   </div>
-                  <span class="text-2xl font-semibold text-brand-dark">{{ score }}%</span>
+                  <span class="text-2xl font-semibold text-ink">{{ score }}%</span>
                 </div>
-                <div class="h-3 overflow-hidden rounded-full bg-slate-200">
+                <div class="h-3 overflow-hidden rounded-full bg-surface-warm">
                   <div class="h-full rounded-full bg-brand-orange" :style="{ width: `${score}%` }"></div>
                 </div>
               </div>
             </div>
-            <p v-else class="mt-4 text-sm leading-7 text-slate-600">{{ scoreSummary }}</p>
+            <p v-else class="mt-4 text-sm leading-7 text-ink-secondary">{{ scoreSummary }}</p>
           </section>
 
           <section class="panel p-6">
             <p class="sheet-kicker">{{ t('detailedAnalysis') }}</p>
-            <p class="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">{{ analysisDisplay }}</p>
+            <p class="mt-4 whitespace-pre-line text-sm leading-7 text-ink">{{ analysisDisplay }}</p>
           </section>
 
           <section class="panel p-6">
             <p class="sheet-kicker">{{ t('advice') }}</p>
-            <p class="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">{{ adviceDisplay }}</p>
+            <p class="mt-4 whitespace-pre-line text-sm leading-7 text-ink">{{ adviceDisplay }}</p>
           </section>
         </div>
 
         <aside class="space-y-4">
           <div class="panel p-5">
             <p class="sheet-kicker">{{ t('shareTitle') }}</p>
-            <p class="mt-2 text-sm leading-6 text-slate-600">{{ t('shareDesc') }}</p>
+            <p class="mt-2 text-sm leading-6 text-ink-secondary">{{ t('shareDesc') }}</p>
             <div class="mt-4 flex gap-3">
               <button class="btn-primary flex-1" @click="nativeShare">{{ copied ? t('copied') : t('shareResult') }}</button>
               <router-link to="/" class="btn-secondary flex-1">{{ t('judgeAgain') }}</router-link>
@@ -331,17 +331,17 @@ function formatInputBlock(entry) {
 
           <div class="panel p-5">
             <p class="sheet-kicker">{{ t('voteTitle') }}</p>
-            <p class="mt-2 text-sm leading-6 text-slate-600">{{ t('voteDesc') }}</p>
+            <p class="mt-2 text-sm leading-6 text-ink-secondary">{{ t('voteDesc') }}</p>
             <div class="mt-4 grid grid-cols-2 gap-3">
               <button class="vote-btn" :disabled="hasVoted || voting" @click="castVote('up')">👍 {{ t('voteUp') }} {{ votes.up }}</button>
               <button class="vote-btn" :disabled="hasVoted || voting" @click="castVote('down')">👎 {{ t('voteDown') }} {{ votes.down }}</button>
             </div>
-            <p v-if="hasVoted" class="mt-3 text-xs text-slate-500">{{ t('alreadyVoted') }}</p>
+            <p v-if="hasVoted" class="mt-3 text-xs text-ink-muted">{{ t('alreadyVoted') }}</p>
           </div>
 
           <div class="panel p-5">
             <p class="sheet-kicker">{{ t('communityTitle') }}</p>
-            <p class="mt-2 text-sm leading-6 text-slate-600">{{ t('communityDesc') }}</p>
+            <p class="mt-2 text-sm leading-6 text-ink-secondary">{{ t('communityDesc') }}</p>
             <router-link to="/community" class="btn-secondary mt-4 w-full">{{ t('goToCommunity') }}</router-link>
           </div>
         </aside>
